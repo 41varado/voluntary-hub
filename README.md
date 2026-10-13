@@ -175,7 +175,7 @@ Se completan en el seguimiento 3. Ver [docs/mediciones](docs/mediciones/README.m
 
 | Integrantes |
 |---|
-| _Manuel Mora Sandi_ (@manuelmora-jpg) |
+| _Manuel Mora Sandi_ (@manuelmora-jpg / Manuel01011) |
 | _Luis Aguilar Monge_ (@Luis9628) |
 | _Dereck Rojas Mendoza_ (@DerekJRM) |
 | _Jafet Alvarado Barboza_ (@41varado) |
