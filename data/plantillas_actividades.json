@@ -1,0 +1,27 @@
+{
+  "_nota": "Plantillas para generar actividades sintéticas. {canton} se reemplaza por un cantón de la provincia de la organización.",
+  "playas": [
+    {"titulo": "Limpieza de playa en {canton}", "lugar": "Playa principal de {canton}", "descripcion": "Recorreremos la playa en grupos para recoger plástico, vidrio y redes abandonadas. Al final se separa y pesa lo recolectado para el informe de la comunidad.\n\nSe entregan guantes y bolsas. La actividad se suspende si hay alerta por oleaje.", "requisitos": "Bloqueador, gorra, agua y zapatos cerrados.", "horas": 3},
+    {"titulo": "Rescate de la desembocadura del río en {canton}", "lugar": "Desembocadura del río, {canton}", "descripcion": "Retiraremos residuos que el río arrastra hacia el mar después de las lluvias. Se trabaja en la orilla, nunca dentro del agua.", "requisitos": "Ropa que se pueda ensuciar, repelente y agua.", "horas": 4}
+  ],
+  "ambiente": [
+    {"titulo": "Siembra de árboles nativos en {canton}", "lugar": "Finca comunal de {canton}", "descripcion": "Sembraremos especies nativas para proteger una naciente. El equipo técnico explica cómo plantar y cada grupo se encarga de una sección.", "requisitos": "Botas, capa y merienda.", "horas": 4},
+    {"titulo": "Mantenimiento del vivero comunal de {canton}", "lugar": "Vivero comunal, {canton}", "descripcion": "Trasplante de plántulas, llenado de bolsas y riego. Ideal para quienes participan por primera vez.", "requisitos": "Guantes de jardinería si tiene.", "horas": 3}
+  ],
+  "educacion": [
+    {"titulo": "Tarde de lectura en la escuela de {canton}", "lugar": "Escuela de {canton}", "descripcion": "Acompañaremos a estudiantes de primer y segundo grado en lectura en voz alta y juegos de comprensión.", "requisitos": "Puntualidad y paciencia. No se requiere experiencia.", "horas": 2},
+    {"titulo": "Tutorías de matemática en {canton}", "lugar": "Salón comunal de {canton}", "descripcion": "Apoyo en tareas de matemática para estudiantes de colegio que preparan sus exámenes.", "requisitos": "Conocimientos de matemática de secundaria.", "horas": 3}
+  ],
+  "salud": [
+    {"titulo": "Feria de salud comunitaria en {canton}", "lugar": "Parque central de {canton}", "descripcion": "Apoyo en el registro de personas, orden de filas y entrega de material informativo durante la feria.", "requisitos": "Camiseta blanca.", "horas": 5},
+    {"titulo": "Acompañamiento a personas mayores en {canton}", "lugar": "Centro diurno de {canton}", "descripcion": "Juegos de mesa, conversación y apoyo en actividades recreativas con personas adultas mayores.", "requisitos": "Buena disposición para conversar.", "horas": 3}
+  ],
+  "animales": [
+    {"titulo": "Jornada de castración en {canton}", "lugar": "Salón comunal de {canton}", "descripcion": "Apoyo en la recepción de mascotas, registro y recuperación posoperatoria bajo guía del equipo veterinario.", "requisitos": "Ser mayor de 16 años.", "horas": 6},
+    {"titulo": "Cuidado en el refugio de {canton}", "lugar": "Refugio de animales, {canton}", "descripcion": "Limpieza de espacios, alimentación y paseos de perros en espera de adopción.", "requisitos": "Ropa cómoda.", "horas": 3}
+  ],
+  "comunidad": [
+    {"titulo": "Armado de paquetes de víveres en {canton}", "lugar": "Gimnasio municipal de {canton}", "descripcion": "Clasificaremos donaciones y armaremos paquetes para familias afectadas por las lluvias.", "requisitos": "Ninguno.", "horas": 4},
+    {"titulo": "Pintura del salón comunal de {canton}", "lugar": "Salón comunal de {canton}", "descripcion": "Lijado y pintura de paredes y mobiliario del salón que usan los grupos de la comunidad.", "requisitos": "Ropa que se pueda manchar.", "horas": 5}
+  ]
+}

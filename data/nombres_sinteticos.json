@@ -1,0 +1,5 @@
+{
+  "_nota": "Listas de nombres y apellidos comunes que se combinan al azar. Ninguna combinación corresponde a una persona real a propósito.",
+  "nombres": ["Ana", "Andrea", "Valeria", "Daniela", "María José", "Fernanda", "Sofía", "Camila", "Gabriela", "Natalia", "Paola", "Mariana", "Laura", "Fabiola", "Karla", "Luis", "José", "Carlos", "Andrés", "Diego", "Esteban", "Jorge", "Pablo", "Mauricio", "Kevin", "Bryan", "Sebastián", "Alonso", "Fabián", "Josué"],
+  "apellidos": ["Vargas", "Rodríguez", "Jiménez", "Mora", "Rojas", "Solano", "Chaves", "Araya", "Quesada", "Hernández", "Castro", "Alfaro", "Calderón", "Brenes", "Monge", "Sánchez", "Ramírez", "Salazar", "Arias", "Méndez", "Campos", "Villalobos", "Cordero", "Zúñiga", "Fallas"]
+}

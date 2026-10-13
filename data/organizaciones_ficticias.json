@@ -1,0 +1,8 @@
+[
+  {"nombre": "Asociación Costas Limpias del Pacífico", "provincia": "Puntarenas", "descripcion": "Grupo comunal que organiza limpiezas de playas y desembocaduras de ríos.", "categorias": ["playas", "ambiente"]},
+  {"nombre": "Red Comunal Raíces del Valle", "provincia": "Cartago", "descripcion": "Reforestación de nacientes y márgenes de ríos con especies nativas.", "categorias": ["ambiente", "comunidad"]},
+  {"nombre": "Tutorías Puente Abierto", "provincia": "San José", "descripcion": "Apoyo escolar y lectura para niñas y niños de comunidades urbanas.", "categorias": ["educacion", "comunidad"]},
+  {"nombre": "Brigada Huellas del Norte", "provincia": "Alajuela", "descripcion": "Rescate, cuidado temporal y campañas de castración de animales.", "categorias": ["animales"]},
+  {"nombre": "Fundación Manos del Caribe", "provincia": "Limón", "descripcion": "Apoyo a comunidades costeras en emergencias y limpieza de playas.", "categorias": ["comunidad", "playas", "salud"]},
+  {"nombre": "Colectivo Salud en Movimiento", "provincia": "Heredia", "descripcion": "Ferias de salud, donación de sangre y acompañamiento a personas mayores.", "categorias": ["salud", "comunidad"]}
+]
