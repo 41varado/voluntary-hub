@@ -1,0 +1,13 @@
+{
+  "name": "VoluntaCR",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "VoluntaCR", "onAutoForward": "openBrowser" }
+  },
+  "postCreateCommand": "bash scripts/codespaces.sh",
+  "postStartCommand": "docker compose up -d"
+}
