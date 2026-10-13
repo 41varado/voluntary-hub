@@ -1,0 +1,5 @@
+# Todas las rutas que no sean archivos reales pasan por index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

@@ -1,0 +1,9 @@
+# Solo se usa si el repositorio completo quedó dentro de public_html.
+# Lo recomendado es que la raíz del sitio apunte a public/ (ver docs/despliegue-virtualmin.md).
+RewriteEngine On
+
+# Nunca servir configuración, código ni datos internos.
+RewriteRule ^(\.env.*|\.git.*|src|scripts|data|docs|storage)(/|$) - [F,L]
+
+# Todo lo demás se atiende desde public/.
+RewriteRule ^(?!public/)(.*)$ public/$1 [L]

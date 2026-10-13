@@ -1,0 +1,33 @@
+# Desarrollo local con un solo comando:  docker compose up -d --build
+# La aplicación queda en http://localhost:8080
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      REDIS_HOST: redis
+    volumes:
+      - ./:/var/www/html
+    # storage/ y public/uploads/ deben ser escribibles por Apache
+    command: bash -c "mkdir -p storage public/uploads && chmod -R a+rwX storage public/uploads && apache2-foreground"
+    depends_on:
+      - mongo
+      - redis
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_datos:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  mongo_datos:
