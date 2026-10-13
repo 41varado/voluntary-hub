@@ -173,12 +173,12 @@ Se completan en el seguimiento 3. Ver [docs/mediciones](docs/mediciones/README.m
 
 ## Equipo
 
-| Integrante | Responsabilidad |
-|---|---|
-| _Nombre Apellido_ (@usuario) | Plataforma, administración de usuarios y despliegue |
-| _Nombre Apellido_ (@usuario) | Actividades y MongoDB |
-| _Nombre Apellido_ (@usuario) | Inscripciones, Redis y tolerancia a fallos |
-| _Nombre Apellido_ (@usuario) | Usuarios, asistencia y datos de prueba |
+| Integrantes |
+|---|
+| _Manuel Mora Sandi_ (@manuelmora-jpg) |
+| _Luis Aguilar Monge_ (@Luis9628) |
+| _Dereck Rojas Mendoza_ (@DerekJRM) |
+| _Jafet Alvarado Barboza_ (@41varado) |
 
 ## Roadmap
 
