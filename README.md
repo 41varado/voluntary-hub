@@ -180,15 +180,6 @@ Se completan en el seguimiento 3. Ver [docs/mediciones](docs/mediciones/README.m
 | _Dereck Rojas Mendoza_ (@DerekJRM) |
 | _Jafet Alvarado Barboza_ (@41varado) |
 
-## Roadmap
-
-- **1 mes:** avisos por correo al reservar y antes de la actividad; lista de espera cuando se llena;
-  recuperación de contraseña por correo.
-- **6 meses:** certificados de horas en PDF verificables; registro de organizaciones con aprobación;
-  mapa de actividades.
-- **Posible trabajo final de graduación:** predicción de inasistencia para sobre-reservar cupos
-  sin dejar gente afuera, y evaluación de la consistencia entre motores bajo fallos.
-
 ## Licencia
 
 [MIT](LICENSE). Puede usarlo, modificarlo y distribuirlo libremente.
