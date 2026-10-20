@@ -96,3 +96,51 @@ Registro de qué se decidió, qué alternativas había y por qué. Se agrega una
 - **Alternativas:** revisar en cada solicitud (una consulta más por página) o no revisar nunca (una
   cuenta desactivada seguiría entrando hasta cerrar sesión).
 - **Por qué:** equilibrio entre seguridad y carga. Si MongoDB no responde, la sesión se mantiene.
+
+## D13. Límite de intentos de inicio de sesión por correo, en Redis
+
+- **Decisión:** tras 5 intentos fallidos con el mismo correo, ese correo queda bloqueado 15 minutos.
+  El contador vive en Redis (`intentos:login:{md5(correo)}`, TTL de 15 minutos) y se borra al
+  acertar la contraseña. Si Redis no responde, se puede iniciar sesión sin límite de intentos.
+- **Alternativas:** contar por dirección IP; guardar los intentos en MongoDB; impedir el inicio de
+  sesión mientras Redis esté caído.
+- **Por qué:** por correo se protege la cuenta atacada sin bloquear a otras personas que comparten
+  la misma IP (por ejemplo, la red de la universidad). El TTL de Redis borra el contador solo, sin
+  escribir en la base principal en cada intento. Redis acelera, no es requisito: con Redis caído es
+  mejor permitir el ingreso sin límite que dejar a todo el mundo afuera.
+- **Costo:** no frena a quien prueba muchos correos distintos desde una misma IP.
+
+## D14. La asistencia se registra solo para inscripciones confirmadas, desde 2 horas antes
+
+- **Decisión:** la lista de asistencia incluye solo las inscripciones confirmadas y se habilita desde
+  2 horas antes del inicio de la actividad. Cada asistencia guarda las horas que tenía la actividad
+  en ese momento (`asistencia.horas`).
+- **Alternativas:** incluir las reservas sin confirmar; permitir registrar la asistencia en cualquier
+  momento; calcular las horas siempre con el valor actual de la actividad.
+- **Por qué:** una reserva sin confirmar puede vencer y su cupo pasar a otra persona; solo la
+  confirmada es un compromiso. Si la asistencia se pudiera registrar en cualquier momento, se
+  podrían sumar horas de una actividad que todavía no ocurre; las 2 horas de margen permiten pasar
+  lista mientras llega la gente. Guardar las horas evita que el historial de un voluntario cambie
+  si después se edita la actividad.
+
+## D15. Horas por tipo de actividad con aggregation pipeline, sin `$lookup`
+
+- **Decisión:** "Mis horas" se calcula con `$match` → `$group` → `$sort` sobre `inscripciones`:
+  agrupa por la copia de la actividad que guarda cada inscripción (`actividad.categoria`) y suma
+  `asistencia.horas`.
+- **Alternativas:** `$lookup` a `actividades` para obtener la categoría; guardar un total de horas en
+  cada usuario y sumarle; traer las inscripciones y sumar en PHP.
+- **Por qué:** con la copia embebida la consulta lee una sola colección, sin unir. Un total guardado
+  se podría desfasar; calcularlo deja una sola fuente de verdad (ver "Embebido o referencia" en el
+  [modelo de datos](modelo-datos.md)). MongoDB agrupa en el servidor y devuelve una fila por tipo
+  de actividad, no todas las inscripciones.
+
+## D16. Una rama por integrante e integración con pull request
+
+- **Decisión:** cada integrante trabaja en su rama (`dev-<nombre>`) y sus cambios entran a `main` con
+  un pull request que aprueba al menos otra persona.
+- **Alternativas:** trabajar directo en `main`, como se hizo hasta el seguimiento 1; una rama por
+  funcionalidad.
+- **Por qué:** cada módulo tiene una persona responsable (D8), así que una rama por integrante
+  alcanza y evita choques. Con el pull request alguien más lee cada cambio antes de que llegue a
+  `main`, y `main` queda estable para crear los tags de cada seguimiento.
