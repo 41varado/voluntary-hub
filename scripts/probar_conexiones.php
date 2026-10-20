@@ -12,7 +12,7 @@ require __DIR__ . '/../src/bootstrap.php';
 
 echo "PHP " . PHP_VERSION . "\n";
 echo "  extensión mongodb: " . (extension_loaded('mongodb') ? phpversion('mongodb') : 'NO INSTALADA') . "\n";
-echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'NO INSTALADA') . "\n\n";
+echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'no instalada; se usa el cliente PHP integrado') . "\n\n";
 
 $todoBien = true;
 
