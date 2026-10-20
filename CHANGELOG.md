@@ -7,6 +7,8 @@ seguimiento del curso.
 
 ### Agregado
 - Entorno de demo en GitHub Codespaces (`.devcontainer/`, `scripts/codespaces.sh`).
+- Cliente de Redis en PHP puro (`src/Nucleo/RedisPolyfill.php`) para servidores sin la extensión
+  `redis`; `/estado` indica qué cliente se está usando.
 - Bitácora del seguimiento 2 (`docs/seguimientos/S2.md`).
 
 ### Cambiado
