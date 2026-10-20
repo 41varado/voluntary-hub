@@ -54,7 +54,7 @@ Aplicación web en PHP con dos motores (perfil B):
 | **Redis** | Acelerador | contador de cupos, candado contra doble envío, caché del listado, intentos de inicio de sesión |
 
 Si Redis no responde, todo sigue funcionando solo con MongoDB, que garantiza el cupo con una
-operación atómica. Si MongoDB no responde, el listado se sigue mostrando desde la caché.
+operación atómica. Si MongoDB no responde, el listado se sigue mostrando desde la caché
 
 MongoDB Atlas es MongoDB alojado en la nube, no otro motor: se puede usar en lugar del MongoDB del
 servidor cambiando solo `MONGO_URI`. No se usan los dos a la vez (ver la decisión D10).
