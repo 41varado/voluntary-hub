@@ -42,6 +42,7 @@ $textosModo = [
             <dl>
                 <dt>Versión</dt><dd><?= e($redis['version']) ?></dd>
                 <dt>Respuesta</dt><dd><?= e($redis['ms']) ?> ms</dd>
+                <dt>Cliente PHP</dt><dd><?= e($redis['cliente'] ?? '') ?></dd>
                 <dt>Prefijo</dt><dd><?= e($redis['prefijo']) ?></dd>
                 <dt>Claves del grupo</dt><dd><?= e($redis['claves'] ?? 0) ?></dd>
                 <dt>Prueba SET/GET</dt><dd><?= e($redis['prueba'] ?? '') ?></dd>

@@ -61,8 +61,8 @@ final class RedisSeguro
             $this->motivo = 'Redis está desactivado en la configuración (REDIS_DESHABILITADO=true).';
             return null;
         }
-        if (!extension_loaded('redis')) {
-            $this->motivo = 'Falta la extensión de PHP "redis".';
+        if (!class_exists('Redis')) {
+            $this->motivo = 'No hay cliente de Redis (falta src/Nucleo/RedisPolyfill.php).';
             return null;
         }
         $hasta = (int) @file_get_contents($this->archivoEstado);
@@ -128,6 +128,12 @@ final class RedisSeguro
         }
     }
 
+    /** "extensión phpredis" o "cliente PHP integrado" (src/Nucleo/RedisPolyfill.php). */
+    public static function tipoCliente(): string
+    {
+        return defined('Redis::CLIENTE_INTEGRADO') ? 'cliente PHP integrado' : 'extensión phpredis';
+    }
+
     /** Datos para la página de estado. */
     public function estado(): array
     {
@@ -144,6 +150,7 @@ final class RedisSeguro
                 'ok'      => true,
                 'ms'      => round($milisegundos, 2),
                 'version' => is_array($info) ? ($info['redis_version'] ?? '?') : '?',
+                'cliente' => self::tipoCliente(),
             ];
         } catch (RedisException $error) {
             $this->marcarCaido($error->getMessage());
