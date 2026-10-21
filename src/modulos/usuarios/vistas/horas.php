@@ -1,5 +1,5 @@
 <?php
-/** Variables: $usuario, $porCategoria, $totalHoras, $totalActiv, $asistidas */
+/** Variables: $usuario, $porCategoria, $totalHoras, $totalActiv, $asistidas, $ranking (ver RankingHoras::consultar) */
 $maximo = max(1, ...array_map(fn($f) => (float) $f['horas'], $porCategoria ?: [['horas' => 1]]));
 ?>
 <div class="encabezado-seccion">
@@ -12,6 +12,9 @@ $maximo = max(1, ...array_map(fn($f) => (float) $f['horas'], $porCategoria ?: [[
 <div class="cifras">
     <div class="cifra"><strong><?= e(rtrim(rtrim(number_format((float) $totalHoras, 1, ',', ''), '0'), ',')) ?></strong><span>horas acumuladas</span></div>
     <div class="cifra"><strong><?= (int) $totalActiv ?></strong><span><?= $totalActiv === 1 ? 'actividad completada' : 'actividades completadas' ?></span></div>
+    <?php if ($ranking['puesto'] !== null): ?>
+        <div class="cifra"><strong><?= (int) $ranking['puesto'] ?>.º</strong><span>puesto de <?= (int) $ranking['participantes'] ?> en el ranking</span></div>
+    <?php endif; ?>
 </div>
 
 <?php if (!$porCategoria): ?>
@@ -31,6 +34,21 @@ $maximo = max(1, ...array_map(fn($f) => (float) $f['horas'], $porCategoria ?: [[
             </div>
         <?php endforeach; ?>
     </div>
+
+    <?php if ($ranking['primeros']): ?>
+        <h2 style="margin-top:2.5rem">Quienes más horas acumulan</h2>
+        <ol class="lista-simple">
+            <?php foreach ($ranking['primeros'] as $fila): ?>
+                <li>
+                    <span><?= (int) $fila['puesto'] ?>. <?= e($fila['nombre']) ?><?= $fila['id'] === $usuario['id'] ? ' (usted)' : '' ?></span>
+                    <strong><?= e(plural($fila['horas'], 'hora', 'horas')) ?></strong>
+                </li>
+            <?php endforeach; ?>
+        </ol>
+        <?php if (Config::bool('APP_MODO_DEMO')): ?>
+            <p class="origen-datos"><?= $ranking['origen'] === 'redis' ? 'Ranking desde Redis (sorted set)' : 'Ranking calculado en MongoDB' ?></p>
+        <?php endif; ?>
+    <?php endif; ?>
 
     <h2 style="margin-top:2.5rem">Actividades completadas</h2>
     <div class="tabla-envoltura">

@@ -67,7 +67,8 @@ Más detalle: [arquitectura](docs/arquitectura/README.md) ·
 
 ## Requisitos
 
-- PHP 8.1 o superior con las extensiones `mongodb` y `redis` (no se usa Composer).
+- PHP 8.1 o superior con la extensión `mongodb` (no se usa Composer). La extensión `redis` es
+  opcional: sin ella se usa el cliente integrado (`src/Nucleo/RedisPolyfill.php`).
 - MongoDB 6 o superior (local o Atlas).
 - Redis 6 o superior (opcional: sin Redis funciona en modo respaldo).
 
@@ -76,7 +77,7 @@ Más detalle: [arquitectura](docs/arquitectura/README.md) ·
 ### Opción A: Docker (recomendada)
 
 ```bash
-git clone https://github.com/USUARIO/voluntacr.git
+git clone https://github.com/41varado/voluntary-hub.git voluntacr
 cd voluntacr
 cp .env.example .env
 docker compose up -d --build

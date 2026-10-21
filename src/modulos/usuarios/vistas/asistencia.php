@@ -21,7 +21,8 @@ $presentes = count(array_filter($confirmados, fn($i) => !empty($i['asistencia'][
 <?php if (!$confirmados): ?>
     <div class="vacio"><p>Todavía nadie ha confirmado su cupo en esta actividad.</p></div>
 <?php else: ?>
-    <form method="post" action="<?= e(url('/panel/actividades/' . $id . '/asistencia')) ?>">
+    <p class="aviso aviso--aviso" data-asistencia-estado role="status" hidden></p>
+    <form method="post" action="<?= e(url('/panel/actividades/' . $id . '/asistencia')) ?>" data-asistencia-sin-conexion="<?= e($id) ?>">
         <?= csrf_campo() ?>
         <div class="tabla-envoltura">
             <table class="tabla">
@@ -46,6 +47,7 @@ $presentes = count(array_filter($confirmados, fn($i) => !empty($i['asistencia'][
         <div class="acciones" style="margin-top:1rem">
             <?php if ($abierta): ?>
                 <button class="boton" type="submit">Guardar asistencia</button>
+                <p class="texto-suave">Si no hay señal, las marcas quedan guardadas en este navegador y se envían solas al volver la conexión. Abra esta página antes de llegar al lugar de la actividad.</p>
             <?php else: ?>
                 <p class="texto-suave">La asistencia se habilita dos horas antes del inicio de la actividad.</p>
             <?php endif; ?>

@@ -3,6 +3,18 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Una versión por
 seguimiento del curso.
 
+## [Sin publicar]
+
+### Agregado
+- Ranking de voluntarios por horas en un sorted set de Redis (`ranking:horas`), visible en "Mis
+  horas". Se reconstruye desde MongoDB cada hora y, si Redis no responde, se calcula en MongoDB.
+- Asistencia sin conexión: si no hay señal al guardar la lista, las marcas quedan en el navegador y
+  se envían solas al volver la conexión.
+
+### Corregido
+- README: el `git clone` apuntaba a un repositorio que no existe, y la extensión `redis` de PHP
+  figuraba como obligatoria.
+
 ## [0.2.0] - 2026-10-20
 
 ### Agregado
