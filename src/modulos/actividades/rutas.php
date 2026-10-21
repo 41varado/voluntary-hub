@@ -59,10 +59,15 @@ return function (Router $router): void {
         if (array_sum(array_map('intval', Ganchos::ejecutar('actividad.antes_de_ver', $actividad))) > 0) {
             $actividad = ActividadRepositorio::buscar($id);
         }
+        $esPropia = ActividadRepositorio::esPropia($actividad, $usuario);
+        // Las visitas de la organización que la publicó no cuentan.
+        if (!$esPropia) {
+            ActividadRepositorio::registrarVisita((string) $actividad['_id']);
+        }
         vista('actividades/detalle', [
             'a'          => $actividad,
             'usuario'    => $usuario,
-            'esPropia'   => ActividadRepositorio::esPropia($actividad, $usuario),
+            'esPropia'   => $esPropia,
             'panel'      => Ganchos::html('actividad.panel', $actividad, $usuario),
         ], $actividad['titulo']);
     });
@@ -71,9 +76,11 @@ return function (Router $router): void {
 
     $router->get('/panel', function (): void {
         $usuario = Sesion::requiere('coordinador');
+        $actividades = ActividadRepositorio::deOrganizacion($usuario['organizacion']['id']);
         vista('actividades/panel', [
             'usuario'     => $usuario,
-            'actividades' => ActividadRepositorio::deOrganizacion($usuario['organizacion']['id']),
+            'actividades' => $actividades,
+            'visitas'     => ActividadRepositorio::visitas(array_map(fn(array $a) => (string) $a['_id'], $actividades)),
         ], 'Panel de mi organización');
     });
 

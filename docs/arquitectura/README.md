@@ -67,6 +67,7 @@ flowchart LR
 | Listado de actividades en caché | Redis | Es la página más visitada; se guarda 60 s y se invalida al cambiar algo. |
 | Copia de respaldo del listado | Redis | Si MongoDB cae, el portal sigue mostrando la última versión conocida (24 h). |
 | Intentos fallidos de inicio de sesión | Redis | Contador con vencimiento de 15 min para frenar ataques por fuerza bruta. |
+| Bitácora de eventos de inscripciones | Redis (stream) | Registro de apoyo de reservas, confirmaciones, cancelaciones y vencimientos, limitado a unos 10 000 eventos; `/estado` muestra los últimos. El estado real de cada inscripción sigue en MongoDB. |
 | Sesiones de usuario | Archivos de PHP | Decisión consciente: si Redis cae, nadie pierde su sesión. |
 
 El detalle de colecciones y claves está en [modelo-datos.md](../modelo-datos.md) y [redis-claves.md](../redis-claves.md).
@@ -85,6 +86,7 @@ sequenceDiagram
     A->>R: EVAL tomar_cupo (GET y DECR si > 0)
     alt contador en 0
         R-->>A: -1 (llena)
+        Note over A,M: Como máximo una vez cada 15 s por actividad,<br/>antes de rechazar se recarga el contador desde MongoDB
         A-->>V: Ya no quedan cupos (sin consultar MongoDB)
     else quedaba cupo
         R-->>A: cupos restantes
@@ -105,8 +107,20 @@ sequenceDiagram
    `cuposDisponibles > 0` sigue impidiendo el sobrecupo. Solo se pierde velocidad bajo carga.
 3. El listado se consulta en MongoDB en cada visita (sin caché).
 4. No hay límite de intentos de inicio de sesión mientras Redis esté caído.
-5. Los coordinadores ven una franja que avisa "Modo respaldo", y `/estado` lo muestra.
-6. Cuando Redis vuelve, los contadores se cargan de nuevo desde MongoDB la primera vez que se usan.
+5. La bitácora de eventos no anota nada; las inscripciones sí se guardan en MongoDB.
+6. Los coordinadores ven una franja que avisa "Modo respaldo", y `/estado` lo muestra.
+
+Cuando Redis vuelve, la aplicación lo usa de nuevo a más tardar 30 s después (el interruptor), sin
+reiniciar nada:
+
+- **Contadores de cupos.** Si un cupo se devolvió (cancelación, reserva vencida o cambio del cupo)
+  mientras Redis no respondía, la clave no se pudo borrar y el contador de esa actividad queda más
+  bajo que el real. La primera reserva que la encuentra "llena" lo confirma en MongoDB, como máximo
+  una vez cada 15 s por actividad: libera las reservas vencidas, borra el contador y lo vuelve a
+  cargar. Un contador más alto que el real no causa sobrecupo, porque MongoDB rechaza la reserva y
+  la clave se borra.
+- **Caché del listado.** Los cambios hechos durante la caída no subieron la versión de la caché, así
+  que una página guardada antes de la caída se puede seguir mostrando hasta 60 s.
 
 ## ¿Qué ocurre si MongoDB se cae?
 
@@ -114,13 +128,17 @@ MongoDB es la fuente de verdad, así que no se puede reservar ni modificar nada 
 un mensaje claro). El listado de actividades se sigue mostrando desde la caché de Redis o desde su
 copia de respaldo, y `/estado` indica "MongoDB no responde".
 
+Si MongoDB deja de responder justo después de que Redis descontó un cupo, el contador de Redis se
+borra, para que no quede un cupo descontado sin reserva; se vuelve a cargar cuando MongoDB responda.
+
 ## ¿Cómo se mantienen consistentes?
 
 - **Contador de cupos:** MongoDB tiene el valor real (`cuposDisponibles`). Redis tiene una copia
   que se carga la primera vez (`SET NX` con 1 h de vencimiento). Cada vez que un cupo se devuelve
   (cancelación, reserva vencida, cambio del cupo total) la clave de Redis se **borra** y se vuelve
   a cargar en la siguiente reserva. Si Redis deja pasar una solicitud de más, MongoDB la rechaza y
-  la clave también se borra.
+  la clave también se borra. Si Redis dice que la actividad está llena, como máximo cada 15 s se
+  confirma en MongoDB y se recarga el contador.
 - **Caché del listado:** se invalida por versión. Cualquier cambio incrementa
   `cache:actividades:version`; las claves viejas dejan de usarse y expiran solas a los 60 s.
 - **Copia de la actividad dentro de la inscripción:** cuando el coordinador edita la actividad, se
@@ -131,4 +149,5 @@ copia de respaldo, y `/estado` indica "MongoDB no responde".
 
 Ver la sección de mediciones del [README](../../README.md#mediciones). La principal:
 500 inscripciones simultáneas sobre una actividad de 50 cupos, con Redis y sin Redis
-(`scripts/medir_cupos.php`), comparando tiempo total, latencia y sobrecupo.
+(`scripts/medir_cupos.php`), comparando tiempo total, latencia y sobrecupo
+([detalle](../mediciones/cupos.md)).

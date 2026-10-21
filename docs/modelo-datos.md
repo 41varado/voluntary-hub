@@ -122,6 +122,9 @@ stateDiagram-v2
 | inscripciones | `{actividadId: 1, estado: 1}` | inscritos y asistencia |
 | inscripciones | `{voluntarioId: 1, actividad.fechaInicio: -1}` | historial del voluntario |
 
+El efecto de los dos índices del portal, comparados con recorrer toda la colección, se mide con
+`explain()` en [mediciones/indice.md](mediciones/indice.md).
+
 ## Validación en la base (JSON Schema)
 
 Además de la validación en PHP, MongoDB rechaza documentos inválidos. Lo más importante:
