@@ -19,6 +19,8 @@ use MongoDB\BSON\UTCDateTime;
 final class ActividadRepositorio
 {
     public const POR_PAGINA = 9;
+    /** Orden del portal: primero las más próximas. */
+    public const ORDEN_PORTAL = ['fechaInicio' => 1];
     private const COLECCION = 'actividades';
 
     /* ---------- Portal público ---------- */
@@ -60,6 +62,29 @@ final class ActividadRepositorio
     private static function consultarPublicadas(array $filtros, int $pagina): array
     {
         $bd = Mongo::get();
+        $filtro = self::filtroPortal($filtros);
+
+        $total = $bd->contar(self::COLECCION, $filtro);
+        $paginas = max(1, (int) ceil($total / self::POR_PAGINA));
+        $pagina = min(max(1, $pagina), $paginas);
+        $documentos = $bd->buscar(self::COLECCION, $filtro, [
+            'sort'       => self::ORDEN_PORTAL,
+            'skip'       => ($pagina - 1) * self::POR_PAGINA,
+            'limit'      => self::POR_PAGINA,
+            'projection' => ['descripcion' => 0, 'requisitos' => 0],
+        ]);
+
+        return [
+            'items'   => array_map([self::class, 'aVista'], $documentos),
+            'total'   => $total,
+            'pagina'  => $pagina,
+            'paginas' => $paginas,
+        ];
+    }
+
+    /** Filtro de MongoDB del portal. scripts/medir_indice.php mide esta misma consulta. */
+    public static function filtroPortal(array $filtros): array
+    {
         $filtro = [
             'estado'      => 'publicada',
             // Se siguen mostrando las que empezaron hace menos de 3 horas.
@@ -77,23 +102,7 @@ final class ActividadRepositorio
         if (!empty($filtros['cupo'])) {
             $filtro['cuposDisponibles'] = ['$gt' => 0];
         }
-
-        $total = $bd->contar(self::COLECCION, $filtro);
-        $paginas = max(1, (int) ceil($total / self::POR_PAGINA));
-        $pagina = min(max(1, $pagina), $paginas);
-        $documentos = $bd->buscar(self::COLECCION, $filtro, [
-            'sort'       => ['fechaInicio' => 1],
-            'skip'       => ($pagina - 1) * self::POR_PAGINA,
-            'limit'      => self::POR_PAGINA,
-            'projection' => ['descripcion' => 0, 'requisitos' => 0],
-        ]);
-
-        return [
-            'items'   => array_map([self::class, 'aVista'], $documentos),
-            'total'   => $total,
-            'pagina'  => $pagina,
-            'paginas' => $paginas,
-        ];
+        return $filtro;
     }
 
     /** Datos simples (sin tipos BSON) para las plantillas y para guardar en caché como JSON. */
@@ -292,6 +301,7 @@ final class ActividadRepositorio
         }
         $bd->eliminar(self::COLECCION, ['_id' => $actual['_id']]);
         Imagenes::borrarCarpeta((string) $actual['_id']);
+        RedisSeguro::get()->usar(fn(Redis $r) => $r->del(self::claveVisitas((string) $actual['_id'])));
         Ganchos::ejecutar('actividad.cupo_cambiado', (string) $actual['_id']);
         self::invalidarCache();
         return null;
@@ -346,6 +356,83 @@ final class ActividadRepositorio
     {
         $rs = RedisSeguro::get();
         $rs->usar(fn(Redis $r) => $r->incr($rs->k('cache:actividades:version')));
+    }
+
+    /* ---------- Visitas al detalle (hash en Redis) ---------- */
+
+    /*
+     * actividad:{id}:visitas tiene un campo por día ("2026-10-27" => visitas) y vence 90 días
+     * después de la última visita. Se usa EVAL porque el cliente integrado
+     * (src/Nucleo/RedisPolyfill.php) no tiene HINCRBY ni HGETALL; además, sumar y renovar el
+     * vencimiento queda en un solo viaje a Redis.
+     */
+    private const LUA_SUMAR_VISITA = <<<'LUA'
+redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+return redis.call('EXPIRE', KEYS[1], ARGV[2])
+LUA;
+
+    private const LUA_LEER_VISITAS = <<<'LUA'
+local resultado = {}
+for i, clave in ipairs(KEYS) do
+  resultado[i] = redis.call('HGETALL', clave)
+end
+return resultado
+LUA;
+
+    private const VISITAS_TTL_SEG = 90 * 86400;
+
+    /** Cuenta una visita al detalle: una por navegador y por día. Si Redis no está, no se cuenta. */
+    public static function registrarVisita(string $actividadId): void
+    {
+        $hoy = date('Y-m-d');
+        if (($_SESSION['visitas']['dia'] ?? '') !== $hoy) {
+            $_SESSION['visitas'] = ['dia' => $hoy, 'actividades' => []];
+        }
+        if (isset($_SESSION['visitas']['actividades'][$actividadId])) {
+            return;
+        }
+        $sumada = RedisSeguro::get()->usar(
+            fn(Redis $r) => $r->eval(self::LUA_SUMAR_VISITA, [self::claveVisitas($actividadId), $hoy, self::VISITAS_TTL_SEG], 1),
+            false
+        );
+        if ($sumada !== false) {
+            $_SESSION['visitas']['actividades'][$actividadId] = true;
+        }
+    }
+
+    /**
+     * Visitas de varias actividades con una sola consulta a Redis: [id => ['total' => n, 'hoy' => n]].
+     * Devuelve null si Redis no responde.
+     */
+    public static function visitas(array $actividadIds): ?array
+    {
+        if (!$actividadIds) {
+            return [];
+        }
+        $actividadIds = array_values($actividadIds);
+        $claves = array_map(fn(string $id) => self::claveVisitas($id), $actividadIds);
+        $respuesta = RedisSeguro::get()->usar(fn(Redis $r) => $r->eval(self::LUA_LEER_VISITAS, $claves, count($claves)));
+        if (!is_array($respuesta)) {
+            return null;
+        }
+
+        $hoy = date('Y-m-d');
+        $visitas = [];
+        foreach ($actividadIds as $i => $id) {
+            // HGETALL responde [campo, valor, campo, valor, ...].
+            $campos = is_array($respuesta[$i] ?? null) ? $respuesta[$i] : [];
+            $porDia = [];
+            for ($j = 0; $j + 1 < count($campos); $j += 2) {
+                $porDia[(string) $campos[$j]] = (int) $campos[$j + 1];
+            }
+            $visitas[$id] = ['total' => array_sum($porDia), 'hoy' => $porDia[$hoy] ?? 0];
+        }
+        return $visitas;
+    }
+
+    private static function claveVisitas(string $actividadId): string
+    {
+        return RedisSeguro::get()->k('actividad:' . $actividadId . ':visitas');
     }
 
     private static function ms(int $inicio): float
