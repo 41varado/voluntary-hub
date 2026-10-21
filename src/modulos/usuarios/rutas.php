@@ -7,6 +7,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/UsuarioRepositorio.php';
+require_once __DIR__ . '/RankingHoras.php';
 
 return function (Router $router): void {
 
@@ -167,6 +168,7 @@ return function (Router $router): void {
             'totalHoras'   => array_sum(array_column($porCategoria, 'horas')),
             'totalActiv'   => count($asistidas),
             'asistidas'    => $asistidas,
+            'ranking'      => RankingHoras::consultar($usuario['id']),
         ], 'Mis horas');
     });
 
@@ -209,21 +211,30 @@ return function (Router $router): void {
         }
         $presentes = array_flip(array_filter((array) ($_POST['presentes'] ?? []), 'is_string'));
         $bd = Mongo::get();
-        $confirmados = $bd->buscar('inscripciones', ['actividadId' => $actividad['_id'], 'estado' => 'confirmada'], ['projection' => ['asistencia' => 1]]);
+        $confirmados = $bd->buscar('inscripciones', ['actividadId' => $actividad['_id'], 'estado' => 'confirmada'], ['projection' => ['asistencia' => 1, 'voluntarioId' => 1]]);
         $cambios = 0;
+        $horasPorVoluntario = [];
         foreach ($confirmados as $inscripcion) {
             $marcado = isset($presentes[(string) $inscripcion['_id']]);
             $estaba = !empty($inscripcion['asistencia']['presente']);
             if ($marcado === $estaba) {
                 continue;
             }
-            $cambios += $bd->actualizar('inscripciones', ['_id' => $inscripcion['_id'], 'estado' => 'confirmada'], ['$set' => ['asistencia' => [
+            $guardado = $bd->actualizar('inscripciones', ['_id' => $inscripcion['_id'], 'estado' => 'confirmada'], ['$set' => ['asistencia' => [
                 'presente'      => $marcado,
                 'horas'         => $marcado ? $actividad['horas'] : 0,
                 'registradaEn'  => Mongo::ahora(),
                 'registradaPor' => Mongo::id($usuario['id']),
             ]]]);
+            if ($guardado > 0) {
+                // Al desmarcar se restan las horas que se habían guardado, no las actuales de la actividad.
+                $voluntario = (string) $inscripcion['voluntarioId'];
+                $horasPorVoluntario[$voluntario] = ($horasPorVoluntario[$voluntario] ?? 0)
+                    + ($marcado ? (float) $actividad['horas'] : -(float) ($inscripcion['asistencia']['horas'] ?? 0));
+            }
+            $cambios += $guardado;
         }
+        RankingHoras::sumar($horasPorVoluntario);
         flash('exito', $cambios > 0 ? 'Asistencia guardada (' . plural($cambios, 'cambio', 'cambios') . ').' : 'No había cambios que guardar.');
         redirigir('/panel/actividades/' . $id . '/asistencia');
     });
