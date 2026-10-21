@@ -19,7 +19,11 @@ use MongoDB\Driver\Exception\BulkWriteException;
  *
  * Si Redis no está, se omiten los pasos 1 y 2: el resultado es el mismo, solo más lento
  * bajo carga. El contador de Redis es una copia: si se desfasa, se borra y se vuelve a
- * cargar desde MongoDB.
+ * cargar desde MongoDB. Cuando dice que la actividad está llena, como máximo cada 15 s se
+ * confirma en MongoDB, así un contador que quedó bajo (por ejemplo, por una cancelación
+ * mientras Redis no respondía) se corrige solo.
+ *
+ * Cada reserva, confirmación, cancelación y vencimiento se anota en el stream "eventos" de Redis.
  *
  * El vencimiento de la reserva vive en MongoDB (no en el TTL de Redis) porque debe
  * sobrevivir a una caída de Redis y porque al vencer hay que devolver el cupo.
@@ -69,6 +73,13 @@ LUA;
                 self::liberarVencidas($actividad);
             }
             return self::reservarEnMongo($actividad, $voluntario, $usuario, $filtro, $inicio);
+        } catch (Throwable $error) {
+            // Por ejemplo, MongoDB dejó de responder después de tomar el cupo en Redis: se borra
+            // el contador para que se vuelva a cargar desde MongoDB (borrar siempre deja un valor correcto).
+            if (($filtro ?? '') === 'si') {
+                self::invalidarContador($actividadId);
+            }
+            throw $error;
         } finally {
             $rs->usar(fn(Redis $r) => $r->del($candado));
         }
@@ -88,10 +99,13 @@ LUA;
                     self::cargarContador($r, $clave, $actividad);
                     continue;
                 }
-                // Llena: antes de rechazar, como máximo cada 15 s se revisa si hay reservas vencidas.
+                // Llena: antes de rechazar, como máximo cada 15 s se confirma en MongoDB. Se liberan
+                // las reservas vencidas y se borra el contador para volver a cargarlo, por si quedó
+                // desfasado (por ejemplo, si alguien canceló mientras Redis no respondía).
                 if ($resultado === -1 && $intento === 0
-                    && $r->set($rs->k('liberando:' . $actividad), '1', ['nx', 'ex' => 15])
-                    && self::liberarVencidas($actividad) > 0) {
+                    && $r->set($rs->k('liberando:' . $actividad), '1', ['nx', 'ex' => 15])) {
+                    self::liberarVencidas($actividad);
+                    $r->del($clave);
                     continue;
                 }
                 break;
@@ -182,7 +196,9 @@ LUA;
         }
 
         Ganchos::ejecutar('cupos.cambiaron', (string) $actividad);
-        return self::resultado(true, 'Cupo reservado. Confírmelo en los próximos ' . self::minutosReserva() . ' minutos; si no, se libera para otra persona.', $motor, $inicio, (string) $inscripcion);
+        $resultado = self::resultado(true, 'Cupo reservado. Confírmelo en los próximos ' . self::minutosReserva() . ' minutos; si no, se libera para otra persona.', $motor, $inicio, (string) $inscripcion);
+        self::anotarEvento('reserva', $actividad, $motor, $resultado['ms']);
+        return $resultado;
     }
 
     /* ---------- Confirmar y cancelar ---------- */
@@ -198,12 +214,13 @@ LUA;
         }
 
         // Solo confirma si la reserva sigue vigente (la condición y el cambio son una sola operación).
-        $confirmadas = $bd->actualizar(
+        $confirmada = $bd->buscarYActualizar(
             'inscripciones',
             ['_id' => $id, 'voluntarioId' => $voluntario, 'estado' => 'reservada', 'expiraEn' => ['$gt' => Mongo::ahora()]],
             ['$set' => ['estado' => 'confirmada', 'confirmadaEn' => Mongo::ahora()]]
         );
-        if ($confirmadas > 0) {
+        if ($confirmada !== null) {
+            self::anotarEvento('confirmacion', $confirmada['actividadId']);
             return self::resultado(true, 'Cupo confirmado. Lo esperamos el día de la actividad.', 'mongodb', $inicio);
         }
 
@@ -244,6 +261,7 @@ LUA;
             return self::resultado(false, 'Esta inscripción ya no estaba activa.', 'mongodb', $inicio);
         }
         self::devolverCupo($doc['actividadId']);
+        self::anotarEvento('cancelacion', $doc['actividadId']);
         return self::resultado(true, 'Inscripción cancelada. Su cupo quedó libre para otra persona.', 'mongodb', $inicio);
     }
 
@@ -272,6 +290,7 @@ LUA;
             );
             if ($cambio !== null) {
                 self::devolverCupo($vencida['actividadId']);
+                self::anotarEvento('vencimiento', $vencida['actividadId']);
                 $liberadas++;
             }
         }
@@ -296,6 +315,68 @@ LUA;
     public static function claveCupos(string $actividadId): string
     {
         return RedisSeguro::get()->k('cupos:' . $actividadId);
+    }
+
+    /* ---------- Bitácora de eventos (stream en Redis) ---------- */
+
+    /*
+     * "eventos" guarda como máximo unos 10 000 (MAXLEN ~) y vence 30 días después del último.
+     * Es un registro de apoyo: el estado real de cada inscripción y sus fechas están en MongoDB.
+     * Se usa EVAL porque el cliente integrado (src/Nucleo/RedisPolyfill.php) no tiene XADD ni
+     * XREVRANGE; además, anotar y renovar el vencimiento queda en un solo viaje a Redis.
+     */
+    private const LUA_ANOTAR_EVENTO = <<<'LUA'
+local id = redis.call('XADD', KEYS[1], 'MAXLEN', '~', ARGV[1], '*',
+    'tipo', ARGV[3], 'actividad', ARGV[4], 'motor', ARGV[5], 'ms', ARGV[6])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return id
+LUA;
+
+    private const LUA_LEER_EVENTOS = <<<'LUA'
+return {redis.call('XLEN', KEYS[1]), redis.call('XREVRANGE', KEYS[1], '+', '-', 'COUNT', ARGV[1])}
+LUA;
+
+    private const EVENTOS_MAXIMO = 10000;
+    private const EVENTOS_TTL_SEG = 30 * 86400;
+
+    /** Anota un evento ("reserva", "confirmacion", "cancelacion", "vencimiento"). Si Redis no está, no se anota. */
+    private static function anotarEvento(string $tipo, ObjectId $actividad, string $motor = '', ?float $ms = null): void
+    {
+        $rs = RedisSeguro::get();
+        $rs->usar(fn(Redis $r) => $r->eval(self::LUA_ANOTAR_EVENTO, [
+            $rs->k('eventos'), self::EVENTOS_MAXIMO, self::EVENTOS_TTL_SEG,
+            $tipo, (string) $actividad, $motor, $ms === null ? '' : (string) $ms,
+        ], 1));
+    }
+
+    /**
+     * Los últimos eventos, del más reciente al más antiguo:
+     * ['total' => n, 'eventos' => [['hora' => segundos, 'tipo', 'actividad', 'motor', 'ms'], ...]].
+     * Devuelve null si Redis no responde.
+     */
+    public static function ultimosEventos(int $cantidad = 10): ?array
+    {
+        $rs = RedisSeguro::get();
+        $respuesta = $rs->usar(fn(Redis $r) => $r->eval(self::LUA_LEER_EVENTOS, [$rs->k('eventos'), $cantidad], 1));
+        if (!is_array($respuesta) || !is_array($respuesta[1] ?? null)) {
+            return null;
+        }
+
+        $eventos = [];
+        foreach ($respuesta[1] as $entrada) {
+            // Cada entrada es [id, [campo, valor, campo, valor, ...]]; el id empieza con los milisegundos.
+            if (!is_array($entrada) || !is_array($entrada[1] ?? null)) {
+                continue;
+            }
+            $campos = [];
+            for ($i = 0; $i + 1 < count($entrada[1]); $i += 2) {
+                $campos[$entrada[1][$i]] = $entrada[1][$i + 1];
+            }
+            $eventos[] = ['hora' => intdiv((int) strstr((string) $entrada[0], '-', true), 1000)] + $campos + [
+                'tipo' => '', 'actividad' => '', 'motor' => '', 'ms' => '',
+            ];
+        }
+        return ['total' => (int) $respuesta[0], 'eventos' => $eventos];
     }
 
     /** Copia de los datos de la actividad que se guarda dentro de la inscripción (para el historial). */

@@ -30,6 +30,23 @@ return function (Router $router): void {
         }
     });
 
+    // Últimos eventos del stream de Redis en la página de estado (con los títulos, si MongoDB responde).
+    Ganchos::agregar('estado.secciones', function (bool $mongoResponde): string {
+        $ultimos = ServicioCupos::ultimosEventos(10);
+        $titulos = [];
+        $ids = array_values(array_filter(array_map(fn(array $e) => Mongo::id($e['actividad']), $ultimos['eventos'] ?? [])));
+        if ($ids && $mongoResponde) {
+            try {
+                foreach (Mongo::get()->buscar('actividades', ['_id' => ['$in' => $ids]], ['projection' => ['titulo' => 1]]) as $actividad) {
+                    $titulos[(string) $actividad['_id']] = $actividad['titulo'];
+                }
+            } catch (Throwable) {
+                // MongoDB no responde: se muestran los identificadores.
+            }
+        }
+        return parcial('inscripciones/eventos', ['ultimos' => $ultimos, 'titulos' => $titulos]);
+    });
+
     // Bloque de inscripción dentro del detalle de la actividad.
     Ganchos::agregar('actividad.panel', function (array $actividad, ?array $usuario): string {
         $inscripcion = null;
