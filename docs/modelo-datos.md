@@ -40,6 +40,10 @@ Se crea con `php scripts/crear_esquema.php`, que aplica la validación **JSON Sc
 | `creadoPor` | ObjectId o null | administrador que la creó; null si se registró sola |
 | `actualizadoEn`, `actualizadoPor` | date, ObjectId | último cambio y quién lo hizo |
 | `sesionesValidasDesde` | date | las sesiones iniciadas antes se cierran (contraseña restablecida o cuenta desactivada) |
+| `correoVerificado` | bool | `false` = no puede iniciar sesión hasta abrir el enlace de confirmación; si falta, está confirmado (D23) |
+| `correoVerificadoEn` | date | cuándo se confirmó |
+| `verificacion` | `{tokenHash, expiraEn, enviadaEn}` o null | enlace vigente: solo el SHA-256 del token, vence en 48 h |
+| `avisosPorCorreo` | bool | `false` = el voluntario recibe los avisos solo en el portal; si falta, también por correo |
 
 Roles:
 
@@ -97,6 +101,25 @@ stateDiagram-v2
     confirmada --> [*]: Asistencia registrada
 ```
 
+### `notificaciones`
+
+Un documento por persona y por aviso (D24): los automáticos y los mensajes de la organización.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `_id` | ObjectId | |
+| `usuarioId` | ObjectId | quien lo recibe |
+| `envioId` | ObjectId | igual en todos los documentos de un mismo envío |
+| `tipo` | string | `mensaje`, `cancelada`, `cambios`, `retirada`, `publicada`, `asistencia` |
+| `titulo`, `mensaje` | string | copia del texto (3 a 150 y 1 a 2000 caracteres) |
+| `actividadId` | ObjectId o null | referencia |
+| `actividad` | `{titulo, fechaInicio}` o null | copia, para la bandeja sin unir colecciones |
+| `enlace` | string o null | página a la que lleva (actividad o "Mis horas") |
+| `remitente` | `{id, nombre, organizacion}` o null | quién escribió el mensaje; null en los automáticos |
+| `leidaEn` | date o null | null = sin leer |
+| `correo` | `{estado, intentos, enviadoEn, motivo}` | `pendiente` → `enviado`, `fallido` (se reintenta hasta 3 veces) u `omitido` (sin correo confirmado, avisos por correo desactivados, cuenta desactivada, dirección de prueba o Mailjet sin configurar) |
+| `creadaEn` | date | |
+
 ## Embebido o referencia: decisiones
 
 | Relación | Decisión | Motivo |
@@ -106,6 +129,10 @@ stateDiagram-v2
 | Inscripción → actividad | **Referencia + copia** (título, fecha, horas…) | "Mis inscripciones" y el historial de horas se leen sin unir colecciones. Si el coordinador edita la actividad, la copia se actualiza en todas sus inscripciones. |
 | Actividad → inscripciones | **Colección aparte** (no embebido) | Una actividad puede tener cientos de inscripciones; embebidas, el documento crecería sin límite y cada reserva reescribiría el documento completo. Además el índice único `(actividadId, voluntarioId)` impide inscripciones dobles. |
 | Usuario → horas | **Calculado** con aggregation pipeline sobre `inscripciones` | Una sola fuente de verdad; no hay contador que se pueda desfasar. |
+| Aviso → destinatarios | **Un documento por persona** (D24) | Cada persona tiene su bandeja y su estado de lectura; un arreglo de lecturas crecería con cada actividad grande. |
+| Aviso → actividad | **Referencia + copia** (título y fecha) | La bandeja se lee sin unir colecciones, aunque la actividad cambie después. |
+| Aviso → correo de la persona | **Se lee al enviar**, no se copia | Vale el correo actual y la preferencia de "Mi cuenta" al momento de enviar o reintentar. |
+| Actividad → avisos enviados | **Calculado** con aggregation pipeline por `envioId` | El historial (personas, lecturas, correos) no guarda contadores que se puedan desfasar. |
 
 ## Índices
 
@@ -121,6 +148,13 @@ stateDiagram-v2
 | inscripciones | `{estado: 1, expiraEn: 1}` | encontrar reservas vencidas |
 | inscripciones | `{actividadId: 1, estado: 1}` | inscritos y asistencia |
 | inscripciones | `{voluntarioId: 1, actividad.fechaInicio: -1}` | historial del voluntario |
+| notificaciones | `{usuarioId: 1, creadaEn: -1}` | bandeja de cada persona |
+| notificaciones | `{usuarioId: 1, leidaEn: 1}` | contador de avisos sin leer |
+| notificaciones | `{actividadId: 1, creadaEn: -1}` | historial de avisos de una actividad |
+| notificaciones | `{correo.estado: 1, creadaEn: 1}` | correos por reintentar y conteos de `/estado` |
+
+El efecto de los dos índices del portal, comparados con recorrer toda la colección, se mide con
+`explain()` en [mediciones/indice.md](mediciones/indice.md).
 
 El efecto de los dos índices del portal, comparados con recorrer toda la colección, se mide con
 `explain()` en [mediciones/indice.md](mediciones/indice.md).
@@ -131,7 +165,9 @@ Además de la validación en PHP, MongoDB rechaza documentos inválidos. Lo más
 
 - `cuposDisponibles` con `minimum: 0` y la regla `$expr: {$lte: ["$cuposDisponibles", "$cupoTotal"]}`:
   aunque hubiera un error en el código, la base no acepta cupos negativos ni más cupos libres que el total.
-- Enumeraciones para `categoria`, `provincia`, `estado` y `rol` (incluido `admin`).
-- Patrón del correo y del nombre de archivo de las imágenes.
+- Enumeraciones para `categoria`, `provincia`, `estado` y `rol` (incluido `admin`), y en
+  `notificaciones` para `tipo` y `correo.estado`.
+- Patrón del correo, del nombre de archivo de las imágenes y del hash del token de confirmación
+  (64 caracteres hexadecimales).
 
 El esquema completo está en [`scripts/crear_esquema.php`](../scripts/crear_esquema.php).

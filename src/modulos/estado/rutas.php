@@ -18,7 +18,7 @@ return function (Router $router): void {
                 $mongo = ['ok' => true] + $bd->ping();
                 $mongo['base'] = $bd->nombreBaseDatos();
                 $mongo['colecciones'] = [];
-                foreach (['organizaciones', 'usuarios', 'actividades', 'inscripciones'] as $coleccion) {
+                foreach (['organizaciones', 'usuarios', 'actividades', 'inscripciones', 'notificaciones'] as $coleccion) {
                     $mongo['colecciones'][$coleccion] = $bd->contar($coleccion);
                 }
             } catch (Throwable $error) {
