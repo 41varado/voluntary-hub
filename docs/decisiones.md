@@ -229,3 +229,64 @@ Registro de qué se decidió, qué alternativas había y por qué. Se agrega una
   de prueba (unas 40 actividades) todos los planes tardan casi lo mismo y la diferencia no se ve.
   Con `hint` cada plan se mide sobre los mismos datos, y la semilla fija (2026) genera siempre los
   mismos, así la medición se puede repetir.
+
+## D23. El correo se confirma con un enlace de Mailjet, y sin confirmarlo no se inicia sesión
+
+- **Decisión:** al crear una cuenta desde la web (registro o administración), la Send API v3.1 de
+  Mailjet le envía un enlace, y hasta abrirlo la cuenta no puede iniciar sesión. El enlace lleva un
+  token al azar de 32 bytes: MongoDB guarda solo su SHA-256, vence en 48 horas y sirve una sola vez.
+  Si la administración cambia el correo de alguien, hay que confirmarlo de nuevo y su sesión abierta
+  se cierra (D12). Las cuentas anteriores, las de los scripts de consola y las de prueba cuentan como
+  confirmadas.
+- **Alternativas:** el verificador de direcciones de Mailjet; dejar entrar sin confirmar y solo
+  impedir las reservas; un código de 6 dígitos para escribir en la página.
+- **Por qué:** el verificador de Mailjet trabaja por listas de contactos, en segundo plano y con
+  créditos de pago: no responde en el momento del registro ni prueba que la dirección sea de quien se
+  registra. El enlace prueba las dos cosas y entra en el plan gratuito. Sin confirmar no se entra
+  porque los avisos (D24) dependen de que el correo sea real. Con el hash, quien lea la base no puede
+  usar los enlaces pendientes. Para pedir otro enlace se usa la cuenta recordada en la sesión del
+  navegador donde se creó o donde se escribió bien la contraseña, nunca un correo escrito en un
+  formulario: así no se puede averiguar qué correos tienen cuenta ni mandarle enlaces a cualquiera.
+  El enlace inicia sesión solo si se abre en ese mismo navegador; si no, pide la contraseña, para
+  que nadie quede dentro de una cuenta que otra persona creó con su correo.
+- **Costo:** sin Mailjet configurado nadie podría entrar, así que en ese caso, y con las direcciones
+  `.test`, el enlace se muestra en la página, en el mismo navegador. Sirve para desarrollo y pruebas,
+  no para producción.
+
+## D24. Un aviso es un documento por destinatario
+
+- **Decisión:** cada aviso se guarda en `notificaciones` como un documento por persona, con una copia
+  del título y del mensaje, su estado de lectura (`leidaEn`) y el estado de su correo. Los
+  documentos de un mismo envío comparten `envioId`. El historial de una actividad (cuántas personas
+  recibieron cada aviso, cuántas lo leyeron y cuántas por correo) sale de una agregación por
+  `envioId`.
+- **Alternativas:** un documento por aviso con un arreglo de quienes lo leyeron; un stream o pub/sub
+  de Redis; solo correo, sin bandeja en el portal.
+- **Por qué:** la bandeja y el contador de no leídos son consultas por `usuarioId`, con su índice y
+  sin unir colecciones. Un arreglo de lecturas crecería con cada actividad grande (hasta 500 cupos)
+  y cada lectura reescribiría el documento del aviso. Como en D15, las cifras del historial se
+  calculan, sin contadores que se puedan desfasar. Redis no sirve como fuente: los avisos son
+  compromisos con las personas y no se pueden perder (D18). Avisar a 500 personas son 500 documentos
+  en una sola escritura (`insertMany`).
+- **Costo:** el texto se repite en cada documento: un mensaje de 2000 caracteres para 500 personas
+  ocupa alrededor de 1 MB.
+
+## D25. El correo sale en la misma solicitud y lo que falla se reintenta desde MongoDB
+
+- **Decisión:** al crear los avisos, el correo se envía enseguida, en lotes de 50 mensajes por
+  llamada a Mailjet y con un tiempo límite de 5 s (`MAILJET_TIMEOUT`). Si Mailjet no responde, los
+  demás lotes no se intentan en esa solicitud. Lo que falla queda como `fallido` en el documento del
+  aviso, y `scripts/enviar_correos.php` (cron cada 5 minutos) lo reintenta hasta 3 veces durante 48
+  horas. Nunca se envía a dominios reservados (`.test`, `.example`, `example.com`…), como los de los
+  datos de prueba. La llamada HTTP usa los streams de PHP, sin Composer ni la extensión curl.
+- **Alternativas:** enviar solo desde el cron; una cola en Redis; la librería oficial de Mailjet con
+  Composer.
+- **Por qué:** casi siempre el correo sale en el momento, sin esperar al cron, y si Mailjet falla la
+  acción del coordinador se guarda igual: el aviso ya está en el portal. La bandeja de salida vive en
+  MongoDB, igual que el vencimiento de las reservas (D3), porque tiene que sobrevivir a una caída de
+  Redis. Dejar de intentar después del primer lote sin respuesta evita que una página espere 5 s por
+  cada lote. Los streams de PHP mantienen la regla de D7: instalar es copiar archivos.
+- **Costo:** el plan gratuito de Mailjet envía 200 correos por día (6000 al mes) y deja en cola, hasta
+  3 días, lo que pasa del límite diario: en una actividad grande cancelada, el correo puede llegar
+  tarde, aunque en el portal el aviso está desde el primer momento. Sin el cron, los correos
+  fallidos no se reintentan.

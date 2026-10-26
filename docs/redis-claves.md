@@ -16,12 +16,13 @@ Reglas del equipo:
   servidor sin la extensión phpredis), como los de hash, sorted set y stream, se ejecutan con `EVAL`.
   Así funcionan igual con los dos clientes.
 
-## Claves en uso (v0.3)
+## Claves en uso
 
 | Clave (sin prefijo) | Estructura | TTL | Quién la usa | Para qué |
 |---|---|---|---|---|
 | `cupos:{actividadId}` | string (entero) | 1 h | Inscripciones | Contador de cupos libres. Un script Lua hace `GET` y `DECR` solo si es mayor que 0. Se borra cuando un cupo se devuelve, y se recarga desde MongoDB. |
 | `candado:reserva:{actividadId}:{usuarioId}` | string | 5 s | Inscripciones | `SET NX`: evita que un doble clic procese dos reservas a la vez. |
+| `candado:aviso:{actividadId}` | string | 10 s | Notificaciones | `SET NX`: un mensaje de la organización por actividad cada 10 s, contra el doble clic. No se borra al terminar, así un segundo envío que llega justo después también se rechaza. Si Redis no responde, no hay candado. |
 | `liberando:{actividadId}` | string | 15 s | Inscripciones | Cuando el contador dice que la actividad está llena, permite confirmarlo en MongoDB como máximo una vez cada 15 s: se liberan las reservas vencidas y se recarga el contador, por si quedó desfasado (por ejemplo, después de una caída de Redis). |
 | `eventos` | stream | 30 días desde el último evento | Inscripciones | Bitácora de reservas, confirmaciones, cancelaciones y vencimientos: tipo, actividad y, en las reservas, el motor y los ms. `XADD` con `MAXLEN ~ 10000` y `EXPIRE` en un solo `EVAL`. `/estado` muestra los últimos 10. Es un registro de apoyo: el estado real de cada inscripción está en MongoDB. |
 | `cache:actividades:version` | string (entero) | sin TTL | Actividades | Versión del listado. `INCR` invalida toda la caché del listado de una vez. |

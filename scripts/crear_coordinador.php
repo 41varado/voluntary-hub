@@ -32,15 +32,17 @@ if ($organizacion === null) {
 
 try {
     $bd->insertar('usuarios', [
-        'nombre'       => $nombre,
-        'correo'       => $correo,
-        'claveHash'    => password_hash($clave, PASSWORD_DEFAULT),
-        'rol'          => 'coordinador',
-        'provincia'    => null,
-        'organizacion' => ['id' => $organizacion['_id'], 'nombre' => $organizacion['nombre']],
-        'activo'       => true,
-        'creadoEn'     => Mongo::ahora(),
-        'creadoPor'    => null,
+        'nombre'           => $nombre,
+        'correo'           => $correo,
+        'claveHash'        => password_hash($clave, PASSWORD_DEFAULT),
+        'rol'              => 'coordinador',
+        'provincia'        => null,
+        'organizacion'     => ['id' => $organizacion['_id'], 'nombre' => $organizacion['nombre']],
+        'activo'           => true,
+        // Quien usa la consola es de confianza: la cuenta no necesita confirmar el correo.
+        'correoVerificado' => true,
+        'creadoEn'         => Mongo::ahora(),
+        'creadoPor'        => null,
     ]);
 } catch (Throwable $error) {
     fwrite(STDERR, Mongo::esDuplicado($error) ? "Ya existe una cuenta con el correo {$correo}.\n" : $error->getMessage() . "\n");

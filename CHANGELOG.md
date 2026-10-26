@@ -3,6 +3,36 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Una versión por
 seguimiento del curso.
 
+## [Sin publicar]
+
+### Agregado
+- Confirmación del correo con un enlace que envía Mailjet (Send API v3.1): las cuentas nuevas no
+  pueden iniciar sesión hasta abrirlo. El enlace vence en 48 horas y sirve una sola vez; se puede
+  pedir otro desde «Confirme su correo» o desde la ficha de la cuenta en Administración.
+- Módulo de avisos (`src/modulos/notificaciones/`):
+  - bandeja «Avisos» con un contador de no leídos para los voluntarios;
+  - avisos automáticos a los inscritos cuando una actividad se cancela, cambia de fecha, lugar,
+    horas o requisitos, sale del portal o se vuelve a publicar, y cuando se registra o se corrige
+    su asistencia;
+  - mensajes de la organización a todos los inscritos de una actividad, con su historial de lecturas.
+- Colección `notificaciones` con validación JSON Schema y cuatro índices; campos de confirmación
+  del correo y de preferencia de avisos en `usuarios`.
+- Cliente de Mailjet sin Composer (`src/Nucleo/Correo.php`), `scripts/enviar_correos.php` para
+  reintentar los correos (cron cada 5 minutos), sección de correo en `/estado` y prueba de Mailjet
+  en `scripts/probar_conexiones.php`.
+- «Mi cuenta»: el voluntario elige si recibe los avisos también por correo.
+- «Acerca»: integrantes del equipo y enlace al repositorio.
+- Decisiones técnicas D23 a D25.
+
+### Cambiado
+- El registro ya no inicia sesión: primero hay que confirmar el correo. Las cuentas anteriores, las
+  de los scripts de consola y las de los datos de prueba cuentan como confirmadas.
+- Una actividad cancelada se puede abrir por enlace (sigue fuera del portal) y dice que se canceló.
+- `.env.example`: `APP_URL` y las variables de Mailjet. `scripts/codespaces.sh` pone en `APP_URL` la
+  dirección del Codespace.
+- README: los avisos por correo salen del roadmap, y el nombre de Derek se escribe como en el resto
+  del repositorio.
+
 ## [0.3.0] - 2026-10-27
 
 ### Agregado
