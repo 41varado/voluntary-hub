@@ -144,3 +144,88 @@ Registro de qué se decidió, qué alternativas había y por qué. Se agrega una
 - **Por qué:** cada módulo tiene una persona responsable (D8), así que una rama por integrante
   alcanza y evita choques. Con el pull request alguien más lee cada cambio antes de que llegue a
   `main`, y `main` queda estable para crear los tags de cada seguimiento.
+
+## D17. Lo que el cliente integrado de Redis no tiene se ejecuta con `EVAL`
+
+- **Decisión:** los comandos de hash, sorted set y stream (`HINCRBY`, `HGETALL`, `ZINCRBY`, `ZADD`,
+  `ZREVRANGE`, `XADD`, `XREVRANGE`…) se ejecutan dentro de scripts Lua con `EVAL`, que existe tanto
+  en la extensión phpredis como en el cliente integrado (`src/Nucleo/RedisPolyfill.php`).
+- **Alternativas:** agregar cada comando al cliente integrado; exigir la extensión phpredis en el
+  servidor; usar solo strings.
+- **Por qué:** el mismo código funciona con los dos clientes, y el cliente integrado no crece con
+  cada estructura nueva. Además, cada script hace varias operaciones en un solo viaje a Redis y sin
+  que otra solicitud se meta en medio: sumar una visita y renovar su vencimiento, o anotar un evento
+  y renovar el del stream. Con solo strings no se cumplirían las tres estructuras que pide el curso.
+- **Costo:** si el Redis del servidor no permitiera `EVAL`, estas funciones se comportarían como con
+  Redis caído (D18), y las reservas seguirían solo con MongoDB.
+
+## D18. Visitas, ranking y bitácora de eventos son datos de apoyo
+
+- **Decisión:** las visitas por actividad y día (hash `actividad:{id}:visitas`), el ranking de horas
+  (sorted set `ranking:horas`) y la bitácora de inscripciones (stream `eventos`) son datos de apoyo.
+  Si Redis no responde, no se cuentan visitas ni se anotan eventos, y el ranking se calcula en
+  MongoDB; las reservas y la asistencia se guardan igual.
+- **Alternativas:** escribirlos también en MongoDB; no permitir la operación mientras Redis no
+  responda.
+- **Por qué:** son datos para mostrar (visitas en el panel, puesto en "Mis horas", últimos eventos
+  en `/estado`), no compromisos con nadie. Guardarlos en MongoDB sumaría una escritura a la base
+  principal en cada visita y en cada inscripción, que es justo la carga que Redis le quita. Y
+  detener una reserva porque no se pudo anotar el evento sería peor que perder el evento.
+- **Costo:** las visitas y los eventos son la excepción a la regla de que ningún dato vive solo en
+  Redis ([redis-claves.md](redis-claves.md)): los de mientras Redis no respondía se pierden. El
+  ranking sí se reconstruye desde MongoDB (D20).
+
+## D19. El contador de cupos se confirma en MongoDB antes de rechazar, como máximo cada 15 s
+
+- **Decisión:** cuando el contador de Redis dice que la actividad está llena, la primera solicitud
+  que lo encuentra así (una cada 15 s por actividad, con `SET NX` en `liberando:{actividad}`) libera
+  las reservas vencidas en MongoDB, borra el contador y lo vuelve a cargar. Las demás se rechazan en
+  Redis, como antes.
+- **Alternativas:** confiar en el contador hasta que venza (1 h); confirmar en MongoDB cada rechazo;
+  corregirlo solo con `scripts/reconciliar_cupos.php`.
+- **Por qué:** si alguien cancela mientras Redis no responde, MongoDB devuelve el cupo, pero la clave
+  de Redis no se puede borrar y el contador queda más bajo que el real: la actividad aparecía llena
+  hasta por una hora. Confirmar cada rechazo lo corregiría, pero mandaría a MongoDB todas las
+  solicitudes que sobran en una avalancha, que es justo lo que el contador evita. Con una
+  confirmación cada 15 s el desfase dura poco y MongoDB sigue protegido. Se prueba en EC-04.
+
+## D20. El ranking se reconstruye desde MongoDB cada hora
+
+- **Decisión:** `ranking:horas` vence a la hora. Mientras existe, guardar la asistencia suma o resta
+  horas con `ZINCRBY`; cuando no existe, la siguiente consulta lo reconstruye con una agregación
+  sobre las asistencias y lo vuelve a guardar.
+- **Alternativas:** reconstruirlo en cada consulta; mantenerlo solo con `ZINCRBY`, sin vencimiento;
+  un cron que lo reconstruya.
+- **Por qué:** si una asistencia se guarda con Redis caído, su `ZINCRBY` se pierde y el ranking queda
+  desfasado. Con el vencimiento, el desfase dura como máximo una hora y se corrige solo, sin otro
+  cron en el servidor. Reconstruirlo en cada consulta sería recorrer todas las asistencias cada vez
+  que alguien abre "Mis horas"; sin vencimiento, un desfase quedaría para siempre.
+
+## D21. La asistencia sin conexión se guarda en el navegador
+
+- **Decisión:** al guardar la lista de asistencia, las marcas se guardan primero en el `localStorage`
+  del navegador del coordinador. Si no hay señal, se reenvían solas al volver la conexión, al
+  recargar la página y cada 30 s. Cada envío lleva la lista completa de presentes, así que repetirlo
+  no duplica nada.
+- **Alternativas:** SQLite como tercer motor (perfil C); IndexedDB con un service worker; no permitir
+  pasar lista sin conexión.
+- **Por qué:** cumple lo que prometía D1 sin agregar un tercer motor: la falta de señal ocurre en el
+  navegador del coordinador, y ahí no hay SQLite. Para una lista de casillas, `localStorage` alcanza
+  y funciona en cualquier navegador; un service worker agregaría bastante código para guardar unos
+  pocos identificadores.
+- **Costo:** las marcas quedan solo en ese navegador hasta que se envían. Si el navegador no permite
+  guardarlas (por ejemplo, en algunas ventanas privadas), la página lo avisa y pide no cerrarla.
+
+## D22. Las mediciones fuerzan los planes con `hint` y usan datos temporales
+
+- **Decisión:** `medir_indice.php` compara los planes de la consulta del portal forzándolos con
+  `hint` (`{$natural: 1}` para el recorrido sin índice), sobre 20 000 actividades sintéticas de una
+  organización temporal que se borran al terminar. `medir_cupos.php` también usa una actividad
+  temporal, y las mediciones sin Redis lo apagan solo dentro del script (`REDIS_DESHABILITADO=true`).
+- **Alternativas:** borrar el índice, medir y volver a crearlo; medir solo con los datos de prueba;
+  detener Redis para medir sin él.
+- **Por qué:** borrar un índice o detener Redis afectaría a quien esté usando la base o el Redis
+  compartido en ese momento, y si el script se interrumpe el índice queda sin crear. Con los datos
+  de prueba (unas 40 actividades) todos los planes tardan casi lo mismo y la diferencia no se ve.
+  Con `hint` cada plan se mide sobre los mismos datos, y la semilla fija (2026) genera siempre los
+  mismos, así la medición se puede repetir.

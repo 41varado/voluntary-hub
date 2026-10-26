@@ -3,15 +3,32 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Una versión por
 seguimiento del curso.
 
-## [Sin publicar]
+## [0.3.0] - 2026-10-27
 
 ### Agregado
+- Visitas por actividad y por día en un hash de Redis (`actividad:{id}:visitas`), visibles en el
+  panel del coordinador.
+- Bitácora de reservas, confirmaciones, cancelaciones y vencimientos en un stream de Redis
+  (`eventos`); `/estado` muestra los últimos 10.
 - Ranking de voluntarios por horas en un sorted set de Redis (`ranking:horas`), visible en "Mis
   horas". Se reconstruye desde MongoDB cada hora y, si Redis no responde, se calcula en MongoDB.
 - Asistencia sin conexión: si no hay señal al guardar la lista, las marcas quedan en el navegador y
   se envían solas al volver la conexión.
+- Pruebas documentadas en `docs/pruebas/`: caso normal (CN-01 a CN-03), error de conexión (EC-01 a
+  EC-06) y datos inválidos (DI-01 a DI-09).
+- Mediciones en `docs/mediciones/`: reservas simultáneas con y sin Redis, listado con y sin caché
+  (`scripts/medir_listado.php`) y consulta del portal con y sin índice (`scripts/medir_indice.php`).
+- Decisiones técnicas D13 a D22 y bitácora del seguimiento 3 (`docs/seguimientos/S3.md`).
+
+### Cambiado
+- Arquitectura y mapa de claves de Redis: las cuatro estructuras en uso y qué hace la aplicación con
+  cada una si Redis no responde.
+- `.env.example`: `APP_REPOSITORIO` apunta al repositorio del equipo.
 
 ### Corregido
+- Un contador de cupos que quedaba más bajo que el real después de una caída de Redis hacía ver la
+  actividad llena hasta por una hora; ahora se confirma en MongoDB, como máximo cada 15 s, antes de
+  rechazar la reserva.
 - README: el `git clone` apuntaba a un repositorio que no existe, y la extensión `redis` de PHP
   figuraba como obligatoria.
 

@@ -10,7 +10,8 @@ Reglas del equipo:
   (`scripts/cargar_datos.php --limpiar`).
 - Nunca `KEYS *`: en un Redis compartido bloquea a los demás grupos. Se usa `SCAN`.
 - Toda clave tiene vencimiento (TTL), salvo `cache:actividades:version`, que es un número pequeño.
-- Ningún dato vive **solo** en Redis: todo se puede reconstruir desde MongoDB.
+- Ningún dato importante vive **solo** en Redis: todo se puede reconstruir desde MongoDB, salvo las
+  visitas y la bitácora de eventos, que son datos de apoyo y se pueden perder (D18).
 - Los comandos que no tiene el cliente integrado (`src/Nucleo/RedisPolyfill.php`, el que se usa en un
   servidor sin la extensión phpredis), como los de hash, sorted set y stream, se ejecutan con `EVAL`.
   Así funcionan igual con los dos clientes.
@@ -26,17 +27,15 @@ Reglas del equipo:
 | `cache:actividades:version` | string (entero) | sin TTL | Actividades | Versión del listado. `INCR` invalida toda la caché del listado de una vez. |
 | `cache:actividades:v{version}:{md5(filtros)}` | string (JSON) | 60 s (`CACHE_TTL_SEG`) | Actividades | Una página del listado con sus filtros. |
 | `respaldo:actividades:{md5(filtros)}` | string (JSON) | 24 h | Actividades | Última versión conocida del listado; solo se lee si MongoDB no responde. |
+| `actividad:{actividadId}:visitas` | hash | 90 días desde la última visita | Actividades | Visitas al detalle, un campo por día (`2026-10-27` → visitas); se cuenta una por navegador y por día. El panel del coordinador muestra el total y las de hoy. `HINCRBY` y `HGETALL` con `EVAL`. |
 | `intentos:login:{md5(correo)}` | string (entero) | 15 min | Usuarios | Intentos fallidos; al llegar a 5 se bloquea ese correo 15 minutos. |
+| `ranking:horas` | sorted set | 1 h | Usuarios | Horas acumuladas por voluntario (miembro: id; puntaje: horas). Guardar la asistencia suma o resta con `ZINCRBY`; al vencer, la siguiente consulta lo reconstruye desde MongoDB con una agregación (D20). "Mis horas" muestra el puesto y los 5 primeros. |
 | `hola` | string | 30 s | Estado | Prueba de escritura y lectura de la página `/estado`. |
 
-## Planeadas para el seguimiento 3
+## Estructuras
 
-El curso pide al menos 3 estructuras distintas. Hoy se usan *string* y *stream*; se agregan:
-
-| Clave | Estructura | Para qué |
-|---|---|---|
-| `ranking:horas` | sorted set | Voluntarios con más horas (`ZINCRBY` al registrar asistencia). Se reconstruye desde MongoDB con una agregación. |
-| `actividad:{id}:visitas` | hash | Visitas y reservas por actividad y día, para el panel del coordinador. |
+El curso pide al menos 3 estructuras distintas. Se usan cuatro: *string* (cupos, candados, caché del
+listado, intentos de inicio de sesión), *hash* (visitas), *sorted set* (ranking) y *stream* (eventos).
 
 ## Comportamiento si Redis no responde
 

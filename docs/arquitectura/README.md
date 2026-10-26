@@ -68,6 +68,8 @@ flowchart LR
 | Copia de respaldo del listado | Redis | Si MongoDB cae, el portal sigue mostrando la última versión conocida (24 h). |
 | Intentos fallidos de inicio de sesión | Redis | Contador con vencimiento de 15 min para frenar ataques por fuerza bruta. |
 | Bitácora de eventos de inscripciones | Redis (stream) | Registro de apoyo de reservas, confirmaciones, cancelaciones y vencimientos, limitado a unos 10 000 eventos; `/estado` muestra los últimos. El estado real de cada inscripción sigue en MongoDB. |
+| Visitas por actividad y día | Redis (hash) | Dato de apoyo para el panel del coordinador: cada visita es una suma en Redis, sin escribir en MongoDB. Si se pierde, solo se pierden visitas (D18). |
+| Ranking de voluntarios por horas | Redis (sorted set) | `ZINCRBY` al guardar la asistencia, y el puesto sale ordenado sin recorrer todas las asistencias. Se reconstruye desde MongoDB cada hora (D20). |
 | Sesiones de usuario | Archivos de PHP | Decisión consciente: si Redis cae, nadie pierde su sesión. |
 
 El detalle de colecciones y claves está en [modelo-datos.md](../modelo-datos.md) y [redis-claves.md](../redis-claves.md).
@@ -108,7 +110,9 @@ sequenceDiagram
 3. El listado se consulta en MongoDB en cada visita (sin caché).
 4. No hay límite de intentos de inicio de sesión mientras Redis esté caído.
 5. La bitácora de eventos no anota nada; las inscripciones sí se guardan en MongoDB.
-6. Los coordinadores ven una franja que avisa "Modo respaldo", y `/estado` lo muestra.
+6. No se cuentan las visitas (el panel del coordinador muestra "—") y el ranking de "Mis horas" se
+   calcula en MongoDB con una agregación.
+7. Los coordinadores ven una franja que avisa "Modo respaldo", y `/estado` lo muestra.
 
 Cuando Redis vuelve, la aplicación lo usa de nuevo a más tardar 30 s después (el interruptor), sin
 reiniciar nada:
@@ -121,6 +125,8 @@ reiniciar nada:
   la clave se borra.
 - **Caché del listado.** Los cambios hechos durante la caída no subieron la versión de la caché, así
   que una página guardada antes de la caída se puede seguir mostrando hasta 60 s.
+- **Ranking de horas.** Las asistencias guardadas durante la caída no sumaron en el ranking. El
+  desfase se corrige cuando la clave vence (a más tardar en una hora) y se reconstruye desde MongoDB.
 
 ## ¿Qué ocurre si MongoDB se cae?
 
