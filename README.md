@@ -214,7 +214,18 @@ docs/              arquitectura, modelo de datos, decisiones, mediciones, bitác
 
 ## Mediciones
 
-Se completan en el seguimiento 3. Ver [docs/mediciones](docs/mediciones/README.md).
+Medidas en GitHub Codespaces el 26 de octubre de 2026, con la mediana de 3 repeticiones. Detalle,
+CSV e interpretación en [docs/mediciones](docs/mediciones/README.md).
+
+| Medición | Con Redis o con índice | Sin Redis o sin índice |
+|---|---|---|
+| Reservas simultáneas (500 sobre 50 cupos) | 438,6 ms en total, sobrecupo 0 | 758,7 ms en total, sobrecupo 0 |
+| Listado de actividades (latencia mediana) | 0,160 ms | 0,958 ms |
+| Consulta del portal con categoría y provincia | 9 documentos examinados, 0,381 ms | 20 042 documentos examinados, 12,526 ms |
+
+MongoDB impide el sobrecupo por sí solo; Redis le quita carga, porque las reservas rechazadas y casi
+todo el listado ya no le llegan. El índice compuesto del portal hace que la consulta lea solo los
+documentos que muestra.
 
 ## Equipo
 

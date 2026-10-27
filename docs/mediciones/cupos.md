@@ -30,17 +30,16 @@ bitácora de eventos agregan pasos a la reserva. El script guarda todas las fila
 
 ## Resultados
 
-_Pendiente de correr._
-
-- **Entorno:** _(Codespaces, tipo de máquina)_
-- **CSV:** _(nombre del archivo)_
+- **Entorno:** GitHub Codespaces, con `docker compose exec app`, el 26 de octubre de 2026.
+- **CSV:** [cupos_20261026_190138.csv](cupos_20261026_190138.csv)
 
 | Modo | Aceptadas | En MongoDB | Sobrecupo | Tiempo total (ms) | Latencia mediana (ms) | p95 (ms) |
 |---|---|---|---|---|---|---|
-| Redis + MongoDB | | | | | | |
-| Solo MongoDB | | | | | | |
+| Redis + MongoDB | 50 | 50 | 0 | 438,6 | 2,13 | 19,29 |
+| Solo MongoDB | 50 | 50 | 0 | 758,7 | 13,54 | 40,04 |
 
-Mediana de 3 repeticiones de 500 solicitudes sobre 50 cupos.
+Mediana de 3 repeticiones de 500 solicitudes sobre 50 cupos. Las tres repeticiones de cada modo
+dieron las mismas aceptadas, inscripciones en MongoDB y sobrecupo.
 
 ## Qué revisar al interpretar
 
@@ -55,4 +54,13 @@ Mediana de 3 repeticiones de 500 solicitudes sobre 50 cupos.
 
 ## Interpretación
 
-_Pendiente: se escribe con los resultados._
+- **No hubo sobrecupo en ningún modo.** De 500 solicitudes simultáneas quedaron exactamente 50
+  inscripciones, con Redis y sin él. Sin Redis, la condición `cuposDisponibles > 0` de
+  `findAndModify` alcanza para impedirlo; es lo mismo que comprueba la prueba EC-03.
+- **Con Redis, las 500 solicitudes terminan en 438,6 ms en lugar de 758,7 ms (42 % menos).** Las 450
+  que sobran se rechazan en Redis sin llegar a MongoDB; sin Redis, todas hacen la operación en
+  MongoDB.
+- **La latencia mediana baja de 13,54 a 2,13 ms, unas 6 veces menos, y el p95 de 40,04 a 19,29 ms.**
+  Como 9 de cada 10 solicitudes son rechazos, la mediana mide sobre todo cuánto cuesta rechazar: un
+  viaje a Redis contra una operación en MongoDB. Con Redis, la reserva aceptada tiene más pasos
+  (candado, script de cupos y bitácora), pero son solo 50 de las 500.

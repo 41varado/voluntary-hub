@@ -156,8 +156,41 @@ Un documento por persona y por aviso (D24): los automáticos y los mensajes de l
 El efecto de los dos índices del portal, comparados con recorrer toda la colección, se mide con
 `explain()` en [mediciones/indice.md](mediciones/indice.md).
 
-El efecto de los dos índices del portal, comparados con recorrer toda la colección, se mide con
-`explain()` en [mediciones/indice.md](mediciones/indice.md).
+## Agregaciones y `explain()`
+
+La aplicación usa cuatro aggregation pipelines. Este es su `explain("executionStats")` con los
+mismos pipelines del código, sobre los datos de prueba de `cargar_datos.php` (semilla 2026: 42
+actividades, 350 inscripciones, 97 de ellas con asistencia, y 12 avisos), en MongoDB 7.0.14 local, el
+27 de octubre de 2026.
+
+| Agregación | Pipeline | Plan ganador | Claves / documentos examinados | Resultado |
+|---|---|---|---|---|
+| Horas por categoría, en "Mis horas" (`UsuarioRepositorio::horasPorCategoria`) | `$match` (voluntario y asistencia) → `$group` por categoría → `$sort` | `IXSCAN historial_voluntario` → `FETCH` → `GROUP`, y después `$sort` | 9 / 9 | 1 categoría, de las 9 inscripciones de voluntario1 |
+| Conteos del panel del coordinador (`ActividadRepositorio::deOrganizacion`) | `$match` (actividades de la organización) → `$group` por actividad y estado | `IXSCAN inscritos_actividad` → `PROJECTION_COVERED` → `GROUP` | 25 / 0 | 5 grupos, de las 7 actividades de coordinador1 |
+| Ranking de horas (`RankingHoras::totales`) | `$match` (con asistencia) → `$group` por voluntario → `$match` → `$sort` | `COLLSCAN` → `GROUP`, y después `$match` y `$sort` | 0 / 350 | 52 voluntarios con horas |
+| Historial de avisos de una actividad (`Notificaciones::historialActividad`) | `$match` (actividad) → `$group` por `envioId` → `$sort` → `$limit` | `IXSCAN avisos_actividad` → `FETCH` → `GROUP`, y después `$sort` | 1 / 1 | 1 envío |
+
+- **Horas por categoría** usa `historial_voluntario` (`{voluntarioId, actividad.fechaInicio}`): lee
+  solo las inscripciones de esa persona, y `asistencia.presente` se filtra al leer cada documento.
+- **Conteos del panel** es una consulta cubierta: `inscritos_actividad` (`{actividadId, estado}`)
+  tiene los dos campos que se agrupan, así que MongoDB cuenta sin leer ningún documento.
+- **Ranking de horas** recorre toda la colección, porque ningún índice empieza por
+  `asistencia.presente`. Se acepta porque solo corre cuando vence `ranking:horas`, como máximo una
+  vez por hora (D20), y con 350 inscripciones tarda 1 ms. Si la colección crece mucho, un índice
+  parcial sobre las inscripciones con asistencia evitaría el recorrido.
+- En las cuatro, MongoDB 7 ejecuta el `$match` y el `$group` dentro del motor de consultas (la etapa
+  `GROUP` del plan); lo que sigue (`$sort`, `$limit`) se hace en el pipeline.
+
+Para repetirlo en `mongosh`, por ejemplo con el ranking:
+
+```js
+db.inscripciones.explain("executionStats").aggregate([
+  { $match: { "asistencia.presente": true } },
+  { $group: { _id: "$voluntarioId", horas: { $sum: "$asistencia.horas" } } },
+  { $match: { horas: { $gt: 0 } } },
+  { $sort: { horas: -1, _id: -1 } }
+])
+```
 
 ## Validación en la base (JSON Schema)
 

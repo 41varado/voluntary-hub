@@ -30,16 +30,15 @@ guarda todas las filas en `docs/mediciones/listado_AAAAMMDD_HHMMSS.csv`.
 
 ## Resultados
 
-_Pendiente de correr._
-
-- **Entorno:** _(Codespaces, tipo de máquina)_
-- **Actividades publicadas:** _(lo imprime el script)_
-- **CSV:** _(nombre del archivo)_
+- **Entorno:** GitHub Codespaces, con `docker compose exec app`, el 26 de octubre de 2026.
+- **Actividades publicadas:** las de los datos de prueba de `cargar_datos.php`. El script imprime
+  cuántas son, pero ese número no queda en el CSV.
+- **CSV:** [listado_20261026_195702.csv](listado_20261026_195702.csv)
 
 | Modo | Consultas desde la caché | Tiempo total (ms) | Latencia mediana (ms) | p95 (ms) |
 |---|---|---|---|---|
-| Con caché (Redis + MongoDB) | | | | |
-| Sin caché (solo MongoDB) | | | | |
+| Con caché (Redis + MongoDB) | 295 de 300 | 73,7 | 0,160 | 0,578 |
+| Sin caché (solo MongoDB) | 0 de 300 | 521,4 | 0,958 | 4,676 |
 
 Mediana de 3 repeticiones de 300 consultas cada una.
 
@@ -54,4 +53,13 @@ Mediana de 3 repeticiones de 300 consultas cada una.
 
 ## Interpretación
 
-_Pendiente: se escribe con los resultados._
+- **295 de 300 consultas salieron de Redis en cada repetición:** solo la primera de cada uno de los
+  5 filtros fue a MongoDB, como se esperaba.
+- **La latencia mediana baja de 0,958 a 0,160 ms, unas 6 veces menos,** y las 300 consultas terminan
+  en 73,7 ms en lugar de 521,4 ms. El p95 baja de 4,676 a 0,578 ms.
+- **En el modo con caché, una consulta resuelta en Redis tarda 0,159 ms (mediana) y una que va a
+  MongoDB, 2,128 ms.** La primera de cada filtro cuesta más que sin caché (0,958 ms) porque además
+  guarda el resultado en Redis; ese costo se paga una vez por filtro mientras dura la caché (60 s, o
+  hasta el siguiente cambio).
+- Con los datos de prueba, MongoDB ya responde en menos de 1 ms. La ganancia de la caché es que el
+  listado, la página más visitada, casi no le pide nada a MongoDB.

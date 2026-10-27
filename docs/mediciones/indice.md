@@ -43,27 +43,26 @@ script guarda todas las filas en `docs/mediciones/indice_AAAAMMDD_HHMMSS.csv`.
 
 ## Resultados
 
-_Pendiente de correr._
-
-- **Entorno:** _(Codespaces, tipo de máquina)_
-- **MongoDB:** _(versión, la imprime el script)_
-- **Actividades en la colección:** _(lo imprime el script)_
-- **CSV:** _(nombre del archivo)_
+- **Entorno:** GitHub Codespaces, con `docker compose exec app`, el 26 de octubre de 2026.
+- **MongoDB:** 7, la imagen `mongo:7` de `docker-compose.yml`. El script imprime la versión exacta,
+  pero no queda en el CSV.
+- **Actividades en la colección:** 20 042: las 42 de los datos de prueba y 20 000 sintéticas.
+- **CSV:** [indice_20261026_190240.csv](indice_20261026_190240.csv)
 
 | Caso | Plan | Claves examinadas | Documentos examinados | Devueltos | Mediana (ms) | Etapas del plan |
 |---|---|---|---|---|---|---|
-| Sin filtros | Sin índice | | | | | |
-| Sin filtros | `portal_por_fecha` | | | | | |
-| Sin filtros | `portal_con_filtros` | | | | | |
-| Sin filtros | Automático | | | | | |
-| Solo categoría | Sin índice | | | | | |
-| Solo categoría | `portal_por_fecha` | | | | | |
-| Solo categoría | `portal_con_filtros` | | | | | |
-| Solo categoría | Automático | | | | | |
-| Categoría y provincia | Sin índice | | | | | |
-| Categoría y provincia | `portal_por_fecha` | | | | | |
-| Categoría y provincia | `portal_con_filtros` | | | | | |
-| Categoría y provincia | Automático | | | | | |
+| Sin filtros | Sin índice | 0 | 20 042 | 9 | 16,624 | SORT → COLLSCAN |
+| Sin filtros | `portal_por_fecha` | 9 | 9 | 9 | 0,348 | LIMIT → FETCH → IXSCAN portal_por_fecha |
+| Sin filtros | `portal_con_filtros` | 10 712 | 9 | 9 | 14,721 | FETCH → SORT → IXSCAN portal_con_filtros |
+| Sin filtros | Automático | 9 | 9 | 9 | 0,341 | LIMIT → FETCH → IXSCAN portal_por_fecha |
+| Solo categoría | Sin índice | 0 | 20 042 | 9 | 12,825 | SORT → COLLSCAN |
+| Solo categoría | `portal_por_fecha` | 54 | 54 | 9 | 0,450 | LIMIT → FETCH → IXSCAN portal_por_fecha |
+| Solo categoría | `portal_con_filtros` | 1 822 | 9 | 9 | 2,658 | FETCH → SORT → IXSCAN portal_con_filtros |
+| Solo categoría | Automático | 54 | 54 | 9 | 0,456 | LIMIT → FETCH → IXSCAN portal_por_fecha |
+| Categoría y provincia | Sin índice | 0 | 20 042 | 9 | 12,526 | SORT → COLLSCAN |
+| Categoría y provincia | `portal_por_fecha` | 372 | 372 | 9 | 1,064 | LIMIT → FETCH → IXSCAN portal_por_fecha |
+| Categoría y provincia | `portal_con_filtros` | 9 | 9 | 9 | 0,381 | LIMIT → FETCH → IXSCAN portal_con_filtros |
+| Categoría y provincia | Automático | 9 | 9 | 9 | 0,375 | LIMIT → FETCH → IXSCAN portal_con_filtros |
 
 La mediana es la de 3 repeticiones; claves y documentos examinados son iguales en todas.
 
@@ -82,4 +81,17 @@ Son hipótesis para confirmar o descartar con los resultados:
 
 ## Interpretación
 
-_Pendiente: se escribe con los resultados._
+Las hipótesis de arriba se confirmaron:
+
+- **Sin índice se examina toda la colección, 20 042 documentos, en los tres casos**, con un `SORT` en
+  memoria: cada consulta tarda entre 12,5 y 16,6 ms.
+- **Categoría y provincia:** con `portal_con_filtros` se examinan 9 claves y 9 documentos, justo los 9
+  que se devuelven, sin `SORT` en memoria. Tarda 0,381 ms, unas 33 veces menos que sin índice
+  (12,526 ms), y es el plan que MongoDB elige solo.
+- **Solo categoría:** `portal_con_filtros` no da el orden por fecha, porque la provincia queda libre en
+  medio del índice: aparece un `SORT` y recorre 1 822 claves (2,658 ms). MongoDB prefiere
+  `portal_por_fecha`, que examina 54 documentos y tarda 0,456 ms.
+- **Sin filtros:** `portal_por_fecha` es el mejor plan (9 claves, 0,348 ms) y es el que elige MongoDB.
+  `portal_con_filtros` recorre 10 712 claves y ordena en memoria (14,721 ms), casi lo mismo que sin
+  índice.
+- **Los dos índices se usan:** cada uno es el mejor plan en algún caso, así que se conservan los dos.
