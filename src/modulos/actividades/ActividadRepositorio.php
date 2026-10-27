@@ -274,7 +274,8 @@ final class ActividadRepositorio
             return "No se pudo cambiar el cupo a {$cupoTotal}: alguien se inscribió mientras editaba. Revise los datos y vuelva a guardar.";
         }
 
-        Ganchos::ejecutar('actividad.actualizada', (string) $actual['_id']);
+        // $actual es la versión anterior: con ella, por ejemplo, se avisa a los inscritos qué cambió.
+        Ganchos::ejecutar('actividad.actualizada', (string) $actual['_id'], $actual);
         if ($diferencia !== 0) {
             Ganchos::ejecutar('actividad.cupo_cambiado', (string) $actual['_id']);
         }
@@ -290,6 +291,10 @@ final class ActividadRepositorio
         Mongo::get()->actualizar(self::COLECCION, ['_id' => $actual['_id']], ['$set' => ['estado' => $estado, 'actualizadaEn' => Mongo::ahora()]]);
         Ganchos::ejecutar('actividad.cupo_cambiado', (string) $actual['_id']);
         self::invalidarCache();
+        // Por ejemplo, el módulo de notificaciones avisa a los inscritos de una cancelación.
+        if ($actual['estado'] !== $estado) {
+            Ganchos::ejecutar('actividad.estado_cambiado', $actual, $estado);
+        }
     }
 
     /** Solo se elimina si nadie se ha inscrito nunca; si no, hay que cancelarla. */

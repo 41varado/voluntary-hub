@@ -26,6 +26,16 @@ final class Catalogos
 
     public const NOMBRES_ROL = ['voluntario' => 'Voluntario', 'coordinador' => 'Coordinación', 'admin' => 'Administración'];
 
+    /** Avisos a las personas inscritas (módulo de notificaciones). Clave => nombre visible */
+    public const TIPOS_AVISO = [
+        'mensaje'    => 'Mensaje de la organización',
+        'cancelada'  => 'Cancelación',
+        'cambios'    => 'Cambios en la actividad',
+        'retirada'   => 'Retiro del portal',
+        'publicada'  => 'Nueva publicación',
+        'asistencia' => 'Asistencia y horas',
+    ];
+
     public static function categoria(string $clave): string
     {
         return self::CATEGORIAS[$clave][0] ?? $clave;

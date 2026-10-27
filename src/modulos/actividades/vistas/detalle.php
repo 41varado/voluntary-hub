@@ -13,7 +13,9 @@ usort($imagenes, fn($x, $y) => ($y['archivo'] === $portada) <=> ($x['archivo'] =
         <p class="detalle__categoria"><?= e(Catalogos::categoria($a['categoria'])) ?>, <?= e($a['provincia']) ?></p>
         <h1><?= e($a['titulo']) ?></h1>
 
-        <?php if ($a['estado'] !== 'publicada'): ?>
+        <?php if ($a['estado'] === 'cancelada'): ?>
+            <p class="aviso aviso--error">La organización canceló esta actividad. Ya no admite reservas.</p>
+        <?php elseif ($a['estado'] !== 'publicada'): ?>
             <p class="aviso aviso--aviso">Esta actividad está en estado «<?= e($a['estado']) ?>» y solo la ve su organización.</p>
         <?php endif; ?>
 

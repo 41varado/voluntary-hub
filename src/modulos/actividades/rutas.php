@@ -52,7 +52,9 @@ return function (Router $router): void {
     $router->get('/actividades/{id}', function (string $id): void {
         $actividad = ActividadRepositorio::buscar($id);
         $usuario = Sesion::usuario();
-        if ($actividad === null || ($actividad['estado'] !== 'publicada' && !ActividadRepositorio::esPropia($actividad, $usuario))) {
+        // Los borradores solo los ve su organización. Las canceladas no salen en el portal, pero se
+        // pueden abrir por enlace, como el del aviso de cancelación, y dicen que se cancelaron.
+        if ($actividad === null || ($actividad['estado'] === 'borrador' && !ActividadRepositorio::esPropia($actividad, $usuario))) {
             abortar(404, 'Esa actividad no existe o ya no está publicada.');
         }
         // Otros módulos pueden actualizar datos antes de mostrarla (p. ej., liberar reservas vencidas).
