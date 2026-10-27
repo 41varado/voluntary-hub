@@ -23,6 +23,9 @@ seguimiento del curso.
 - «Mi cuenta»: el voluntario elige si recibe los avisos también por correo.
 - «Acerca»: integrantes del equipo y enlace al repositorio.
 - Decisiones técnicas D23 a D25.
+- Pruebas automatizadas de `docs/pruebas` (`scripts/pruebas/correr.php`): siguen por HTTP los pasos
+  del caso normal, el error de conexión y los datos inválidos, y guardan el resultado de cada paso en
+  `docs/pruebas/resultados/`. Los pasos que necesitan detener un motor se omiten.
 
 ### Cambiado
 - El registro ya no inicia sesión: primero hay que confirmar el correo. Las cuentas anteriores, las
