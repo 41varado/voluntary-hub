@@ -197,6 +197,7 @@ consola ya tienen el correo confirmado.
 | `scripts/enviar_correos.php` | Reintenta los correos de los avisos que fallaron (para cron, cada 5 minutos) |
 | `scripts/reconciliar_cupos.php` | Revisa que los cupos coincidan con las inscripciones |
 | `scripts/medir_cupos.php` | Medición de reservas simultáneas con y sin Redis |
+| `scripts/pruebas/correr.php` | Pruebas automatizadas de `docs/pruebas` (caso normal, error de conexión, datos inválidos) |
 | `scripts/crear_backlog.sh` | Crea hitos e issues en GitHub |
 
 ## Estructura

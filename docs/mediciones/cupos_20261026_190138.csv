@@ -1,0 +1,7 @@
+modo,repeticion,solicitudes,cupos,aceptadas,inscritos_bd,cupos_libres,sobrecupo,tiempo_ms,mediana_ms,p95_ms
+redis,1,500,50,50,50,0,0,332.2,3,17.93
+redis,2,500,50,50,50,0,0,438.6,2.13,19.29
+redis,3,500,50,50,50,0,0,448.3,1.98,27.37
+mongodb,1,500,50,50,50,0,0,758.7,12.84,51.56
+mongodb,2,500,50,50,50,0,0,757.9,14.26,37.05
+mongodb,3,500,50,50,50,0,0,771.9,13.54,40.04
