@@ -13,6 +13,18 @@ if [ ! -f .env ]; then
   echo "Se creó .env a partir de .env.example"
 fi
 
+# En Codespaces, los enlaces de los correos apuntan a la dirección reenviada del puerto 8080.
+# Solo se cambia el valor de ejemplo (localhost): si alguien puso otra dirección, se respeta.
+if [ -n "${CODESPACE_NAME:-}" ]; then
+  url="https://${CODESPACE_NAME}-8080.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
+  if grep -q '^APP_URL=' .env; then
+    sed -i "s#^APP_URL=http://localhost:8080\$#APP_URL=${url}#" .env
+  else
+    echo "APP_URL=${url}" >> .env
+  fi
+  echo "APP_URL: $(grep '^APP_URL=' .env | cut -d= -f2-)"
+fi
+
 docker compose up -d --build
 
 echo "Esperando a que MongoDB y Redis respondan..."

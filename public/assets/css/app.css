@@ -89,6 +89,11 @@ img { max-width: 100%; display: block; }
 .menu a { color: var(--blanco); text-decoration: none; padding: 0.3rem 0; border-bottom: 3px solid transparent; }
 .menu a:hover { border-bottom-color: rgba(255, 255, 255, 0.5); color: var(--blanco); }
 .menu a[aria-current="page"] { border-bottom-color: var(--guayacan); }
+.menu__contador {
+    display: inline-block; min-width: 1.45em; padding: 0 0.4em; margin-left: 0.1rem;
+    border-radius: 999px; background: var(--guayacan); color: var(--tinta);
+    font-size: 0.8rem; font-weight: 700; line-height: 1.45; text-align: center;
+}
 .cuenta { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .cuenta__nombre { font-size: 0.95rem; color: var(--blanco); }
 .cuenta a { color: var(--blanco); }
@@ -294,6 +299,16 @@ input[type="file"] { font: inherit; }
 
 .vacio { text-align: left; padding: 2rem; background: var(--blanco); border: 1px dashed #b7c2b9; border-radius: var(--radio); }
 .vacio h2 { font-size: 1.3rem; }
+
+/* ---------- Avisos (bandeja del voluntario) ---------- */
+
+.bandeja { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+.bandeja__aviso { background: var(--blanco); border: 1px solid var(--linea); border-left: 5px solid var(--linea); border-radius: var(--radio); padding: 1.1rem 1.25rem; }
+.bandeja__aviso--nuevo { border-left-color: var(--guayacan); }
+.bandeja__aviso p { margin: 0 0 0.5rem; }
+.bandeja__aviso .bandeja__meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; align-items: center; margin-bottom: 0.4rem; font-size: 0.92rem; font-weight: 700; color: var(--musgo); }
+.bandeja__titulo { font-size: 1.25rem; margin: 0 0 0.5rem; }
+.bandeja__aviso .bandeja__enlace { margin: 0.75rem 0 0; }
 
 /* ---------- Perfil / horas ---------- */
 

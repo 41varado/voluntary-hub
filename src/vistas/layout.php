@@ -30,7 +30,8 @@ $rutaActual = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '
         <nav class="menu" aria-label="Principal">
             <?php foreach ($menu as $enlace): ?>
                 <?php $activo = $rutaActual === rtrim($enlace['url'], '/') || ($enlace['url'] !== url('/') && str_starts_with($rutaActual, rtrim($enlace['url'], '/') . '/')); ?>
-                <a href="<?= e($enlace['url']) ?>"<?= $activo ? ' aria-current="page"' : '' ?>><?= e($enlace['texto']) ?></a>
+                <?php $contador = (int) ($enlace['contador'] ?? 0); // por ejemplo, avisos sin leer ?>
+                <a href="<?= e($enlace['url']) ?>"<?= $activo ? ' aria-current="page"' : '' ?><?= $contador > 0 ? ' aria-label="' . e($enlace['texto'] . ', ' . $contador . ' sin leer') . '"' : '' ?>><?= e($enlace['texto']) ?><?php if ($contador > 0): ?> <span class="menu__contador" aria-hidden="true"><?= $contador ?></span><?php endif; ?></a>
             <?php endforeach; ?>
         </nav>
         <div class="cuenta">
@@ -61,7 +62,7 @@ $rutaActual = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '
 <footer class="pie">
     <div class="pie__interior">
         <p><?= e($nombreApp) ?> es software libre (licencia MIT), hecho para el curso Tópicos Avanzados de Bases de Datos de la Universidad Nacional.</p>
-        <p><a href="<?= e(url('/estado')) ?>">Estado del sistema</a> <a href="<?= e(Config::get('APP_REPOSITORIO', 'https://github.com/')) ?>" rel="noopener">Código en GitHub</a></p>
+        <p><a href="<?= e(url('/estado')) ?>">Estado del sistema</a> <a href="<?= e(Config::get('APP_REPOSITORIO', 'https://github.com/41varado/voluntary-hub')) ?>" rel="noopener">Código en GitHub</a></p>
     </div>
 </footer>
 <script src="<?= e(url('/assets/js/app.js')) ?>" defer></script>
