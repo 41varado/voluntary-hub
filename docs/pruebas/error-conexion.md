@@ -19,7 +19,7 @@ El script sigue los pasos por HTTP, con una sesión por cuenta, y al título de 
 prueba le agrega la fecha y la hora de la corrida («Prueba CN-01 1026-2013»).
 
 Los pasos que necesitan pausar o detener un motor no se pueden automatizar en el servidor del curso:
-se hicieron en vivo con el profesor y dieron el resultado esperado. De esos pasos no hay evidencia escrita.
+se hicieron en vivo con el profesor el 20 de octubre y dieron el resultado esperado. De esos pasos no hay evidencia escrita.
 
 ## Preparación
 
@@ -67,7 +67,7 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 
 - **Evidencia:** paso 1 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-01; pasos 2 a 6 sin evidencia escrita.
 - **Estado:** Pasa. El paso 1 lo corrió el script; los pasos 2 a 6 se hicieron en vivo con el profesor.
-- **Fecha y entorno:** paso 1: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 a 6: _(completar: fecha de la prueba en vivo)_
+- **Fecha y entorno:** paso 1: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 a 6: 2026-10-20, en vivo con el profesor
 
 ### EC-02 · Con Redis caído, la aplicación sigue funcionando
 
@@ -85,7 +85,7 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 
 - **Evidencia:** sin evidencia escrita; se hizo en vivo con el profesor.
 - **Estado:** Pasa, en vivo con el profesor.
-- **Fecha y entorno:** _(completar: fecha de la prueba en vivo)_
+- **Fecha y entorno:** 2026-10-20, en vivo con el profesor
 
 ### EC-03 · Sin Redis no hay sobrecupo, ni con 500 solicitudes simultáneas
 
@@ -139,7 +139,7 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 
 - **Evidencia:** sin evidencia escrita; se hizo en vivo con el profesor.
 - **Estado:** Pasa, en vivo con el profesor.
-- **Fecha y entorno:** _(completar: fecha de la prueba en vivo)_
+- **Fecha y entorno:** 2026-10-20, en vivo con el profesor
 
 ### EC-06 · La bitácora de eventos con Redis caído
 
@@ -156,5 +156,5 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 
 - **Evidencia:** pasos 1 y 4 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-06; pasos 2 y 3 sin evidencia escrita.
 - **Estado:** Pasa. Los pasos 1 y 4 los corrió el script; los pasos 2 y 3 se hicieron en vivo con el profesor.
-- **Fecha y entorno:** pasos 1 y 4: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 y 3: _(completar: fecha de la prueba en vivo)_
+- **Fecha y entorno:** pasos 1 y 4: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 y 3: 2026-10-20, en vivo con el profesor
 - **Notas:** El paso 4 se hizo con el cliente de Redis de la aplicación en lugar de `redis-cli`.

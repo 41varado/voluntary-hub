@@ -3,6 +3,22 @@
 Cada script de medición guarda aquí un CSV con todas las repeticiones. El curso pide al menos
 3 mediciones, cada una con 3 ejecuciones o más, reportando la mediana.
 
+## Resultados
+
+Medidos en GitHub Codespaces el 26 de octubre de 2026, con la mediana de 3 repeticiones. El detalle
+y la interpretación de cada medición están en su archivo.
+
+| Medición | Con Redis o con índice | Sin Redis o sin índice |
+|---|---|---|
+| [Reservas simultáneas](cupos.md): 500 solicitudes sobre 50 cupos | 438,6 ms en total; latencia mediana 2,13 ms; sobrecupo 0 | 758,7 ms en total; latencia mediana 13,54 ms; sobrecupo 0 |
+| [Listado de actividades](listado.md): latencia mediana de 300 consultas | 0,160 ms; 295 de 300 desde la caché | 0,958 ms |
+| [Consulta del portal](indice.md) con categoría y provincia, sobre 20 042 actividades | 9 documentos examinados; 0,381 ms (`portal_con_filtros`) | 20 042 documentos examinados; 12,526 ms |
+
+- Redis no es lo que impide el sobrecupo: sin él tampoco lo hubo. Lo que hace es quitarle carga a
+  MongoDB, porque las reservas rechazadas y casi todo el listado ya no le llegan.
+- El índice `portal_con_filtros` hace que la consulta del portal lea solo los 9 documentos que
+  muestra, en lugar de toda la colección, y tarde unas 33 veces menos.
+
 ## 1. Reservas simultáneas con y sin Redis
 
 ```bash

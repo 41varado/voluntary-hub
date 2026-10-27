@@ -3,9 +3,26 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Una versión por
 seguimiento del curso.
 
-## [Sin publicar]
+## [0.3.0] - 2026-10-27
 
 ### Agregado
+- Visitas por actividad y por día en un hash de Redis (`actividad:{id}:visitas`), visibles en el
+  panel del coordinador.
+- Bitácora de reservas, confirmaciones, cancelaciones y vencimientos en un stream de Redis
+  (`eventos`); `/estado` muestra los últimos 10.
+- Ranking de voluntarios por horas en un sorted set de Redis (`ranking:horas`), visible en "Mis
+  horas". Se reconstruye desde MongoDB cada hora y, si Redis no responde, se calcula en MongoDB.
+- Asistencia sin conexión: si no hay señal al guardar la lista, las marcas quedan en el navegador y
+  se envían solas al volver la conexión.
+- Pruebas documentadas en `docs/pruebas/`: caso normal (CN-01 a CN-03), error de conexión (EC-01 a
+  EC-06) y datos inválidos (DI-01 a DI-09), con los resultados del 26 de octubre.
+- Pruebas automatizadas de `docs/pruebas` (`scripts/pruebas/correr.php`): siguen por HTTP los pasos
+  del caso normal, el error de conexión y los datos inválidos, y guardan el resultado de cada paso en
+  `docs/pruebas/resultados/`. Los pasos que necesitan detener un motor se omiten.
+- Mediciones en `docs/mediciones/`, con sus resultados e interpretación: reservas simultáneas con y
+  sin Redis, listado con y sin caché (`scripts/medir_listado.php`) y consulta del portal con y sin
+  índice (`scripts/medir_indice.php`).
+- Las cuatro agregaciones de la aplicación, documentadas con `explain()` en `docs/modelo-datos.md`.
 - Confirmación del correo con un enlace que envía Mailjet (Send API v3.1): las cuentas nuevas no
   pueden iniciar sesión hasta abrirlo. El enlace vence en 48 horas y sirve una sola vez; se puede
   pedir otro desde «Confirme su correo» o desde la ficha de la cuenta en Administración.
@@ -22,12 +39,12 @@ seguimiento del curso.
   en `scripts/probar_conexiones.php`.
 - «Mi cuenta»: el voluntario elige si recibe los avisos también por correo.
 - «Acerca»: integrantes del equipo y enlace al repositorio.
-- Decisiones técnicas D23 a D25.
-- Pruebas automatizadas de `docs/pruebas` (`scripts/pruebas/correr.php`): siguen por HTTP los pasos
-  del caso normal, el error de conexión y los datos inválidos, y guardan el resultado de cada paso en
-  `docs/pruebas/resultados/`. Los pasos que necesitan detener un motor se omiten.
+- Decisiones técnicas D13 a D25 y bitácora del seguimiento 3 (`docs/seguimientos/S3.md`).
 
 ### Cambiado
+- Arquitectura y mapa de claves de Redis: las cuatro estructuras en uso y qué hace la aplicación con
+  cada una si Redis no responde.
+- `.env.example`: `APP_REPOSITORIO` apunta al repositorio del equipo.
 - El registro ya no inicia sesión: primero hay que confirmar el correo. Las cuentas anteriores, las
   de los scripts de consola y las de los datos de prueba cuentan como confirmadas.
 - Una actividad cancelada se puede abrir por enlace (sigue fuera del portal) y dice que se canceló.
@@ -35,28 +52,6 @@ seguimiento del curso.
   dirección del Codespace.
 - README: los avisos por correo salen del roadmap, y el nombre de Derek se escribe como en el resto
   del repositorio.
-
-## [0.3.0] - 2026-10-27
-
-### Agregado
-- Visitas por actividad y por día en un hash de Redis (`actividad:{id}:visitas`), visibles en el
-  panel del coordinador.
-- Bitácora de reservas, confirmaciones, cancelaciones y vencimientos en un stream de Redis
-  (`eventos`); `/estado` muestra los últimos 10.
-- Ranking de voluntarios por horas en un sorted set de Redis (`ranking:horas`), visible en "Mis
-  horas". Se reconstruye desde MongoDB cada hora y, si Redis no responde, se calcula en MongoDB.
-- Asistencia sin conexión: si no hay señal al guardar la lista, las marcas quedan en el navegador y
-  se envían solas al volver la conexión.
-- Pruebas documentadas en `docs/pruebas/`: caso normal (CN-01 a CN-03), error de conexión (EC-01 a
-  EC-06) y datos inválidos (DI-01 a DI-09).
-- Mediciones en `docs/mediciones/`: reservas simultáneas con y sin Redis, listado con y sin caché
-  (`scripts/medir_listado.php`) y consulta del portal con y sin índice (`scripts/medir_indice.php`).
-- Decisiones técnicas D13 a D22 y bitácora del seguimiento 3 (`docs/seguimientos/S3.md`).
-
-### Cambiado
-- Arquitectura y mapa de claves de Redis: las cuatro estructuras en uso y qué hace la aplicación con
-  cada una si Redis no responde.
-- `.env.example`: `APP_REPOSITORIO` apunta al repositorio del equipo.
 
 ### Corregido
 - Un contador de cupos que quedaba más bajo que el real después de una caída de Redis hacía ver la
