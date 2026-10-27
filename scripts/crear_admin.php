@@ -25,15 +25,17 @@ if (mb_strlen($nombre) < 3 || !filter_var($correo, FILTER_VALIDATE_EMAIL) || mb_
 
 try {
     Mongo::get()->insertar('usuarios', [
-        'nombre'       => $nombre,
-        'correo'       => $correo,
-        'claveHash'    => password_hash($clave, PASSWORD_DEFAULT),
-        'rol'          => 'admin',
-        'provincia'    => null,
-        'organizacion' => null,
-        'activo'       => true,
-        'creadoEn'     => Mongo::ahora(),
-        'creadoPor'    => null,
+        'nombre'           => $nombre,
+        'correo'           => $correo,
+        'claveHash'        => password_hash($clave, PASSWORD_DEFAULT),
+        'rol'              => 'admin',
+        'provincia'        => null,
+        'organizacion'     => null,
+        'activo'           => true,
+        // Quien usa la consola es de confianza: así se puede instalar sin Mailjet configurado.
+        'correoVerificado' => true,
+        'creadoEn'         => Mongo::ahora(),
+        'creadoPor'        => null,
     ]);
 } catch (Throwable $error) {
     fwrite(STDERR, Mongo::esDuplicado($error) ? "Ya existe una cuenta con el correo {$correo}.\n" : $error->getMessage() . "\n");

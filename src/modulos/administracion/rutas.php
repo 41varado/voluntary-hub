@@ -7,6 +7,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/usuarios/UsuarioRepositorio.php';
+require_once dirname(__DIR__) . '/usuarios/VerificacionCorreo.php';
 require_once __DIR__ . '/AdminUsuarios.php';
 
 return function (Router $router): void {
@@ -24,6 +25,13 @@ return function (Router $router): void {
             abortar(404, 'Esa cuenta no existe o se administra desde la pantalla de administradores.');
         }
         return $doc;
+    };
+
+    /** Envía el enlace de confirmación a una cuenta nueva o con un correo nuevo y explica qué pasó. */
+    $enviarEnlace = function (array $doc): string {
+        $envio = VerificacionCorreo::enviar($doc);
+        return VerificacionCorreo::textoResultado($envio, $doc['correo'])
+            . ($envio['estado'] === 'enviado' ? ' La persona debe abrirlo antes de iniciar sesión.' : ' Cuando intente iniciar sesión, la persona podrá pedirlo de nuevo.');
     };
 
     $formulario = function (?array $doc, array $valores, array $errores, string $titulo, int $codigo = 200): void {
@@ -60,14 +68,14 @@ return function (Router $router): void {
         $formulario(null, ['rol' => 'voluntario'], [], 'Crear usuario');
     });
 
-    $router->post('/admin/usuarios', function () use ($formulario): void {
+    $router->post('/admin/usuarios', function () use ($formulario, $enviarEnlace): void {
         $admin = Sesion::requiere('admin');
         [$doc, $errores] = AdminUsuarios::crearRegular($_POST, $admin);
         if ($errores) {
             $formulario(null, $_POST, $errores, 'Crear usuario', 422);
             return;
         }
-        flash('exito', 'Cuenta creada para ' . $doc['nombre'] . '. Compártale la contraseña inicial por un medio seguro.');
+        flash('exito', 'Cuenta creada para ' . $doc['nombre'] . '. ' . $enviarEnlace($doc) . ' Compártale la contraseña inicial por un medio seguro.');
         redirigir('/admin/usuarios');
     });
 
@@ -83,7 +91,7 @@ return function (Router $router): void {
         ], [], 'Editar usuario');
     });
 
-    $router->post('/admin/usuarios/{id}', function (string $id) use ($regular, $formulario): void {
+    $router->post('/admin/usuarios/{id}', function (string $id) use ($regular, $formulario, $enviarEnlace): void {
         $admin = Sesion::requiere('admin');
         $doc = $regular($id);
         $errores = AdminUsuarios::actualizarRegular($doc, $_POST, $admin);
@@ -91,7 +99,20 @@ return function (Router $router): void {
             $formulario($doc, $_POST, $errores, 'Editar usuario', 422);
             return;
         }
-        flash('exito', 'Cambios guardados. Se aplican la próxima vez que esa persona use el sistema.');
+        $actualizado = UsuarioRepositorio::buscar($id);
+        if ($actualizado !== null && $actualizado['correo'] !== $doc['correo']) {
+            flash('exito', 'Cambios guardados. El correo nuevo tiene que confirmarse y la sesión abierta se cierra. ' . $enviarEnlace($actualizado));
+        } else {
+            flash('exito', 'Cambios guardados. Se aplican la próxima vez que esa persona use el sistema.');
+        }
+        redirigir('/admin/usuarios/' . $id);
+    });
+
+    $router->post('/admin/usuarios/{id}/verificacion', function (string $id) use ($regular): void {
+        Sesion::requiere('admin');
+        $doc = $regular($id);
+        $envio = VerificacionCorreo::enviar($doc);
+        flash($envio['estado'] === 'enviado' ? 'exito' : 'aviso', VerificacionCorreo::textoResultado($envio, $doc['correo']));
         redirigir('/admin/usuarios/' . $id);
     });
 
@@ -131,14 +152,14 @@ return function (Router $router): void {
         vista('administracion/administrador_nuevo', ['valores' => [], 'errores' => []], 'Agregar administrador');
     });
 
-    $router->post('/admin/administradores', function (): void {
+    $router->post('/admin/administradores', function () use ($enviarEnlace): void {
         $admin = Sesion::requiere('admin');
         [$doc, $errores] = AdminUsuarios::crearAdministrador($_POST, $admin);
         if ($errores) {
             vista('administracion/administrador_nuevo', ['valores' => $_POST, 'errores' => $errores], 'Agregar administrador', 422);
             return;
         }
-        flash('exito', $doc['nombre'] . ' ya es administrador.');
+        flash('exito', $doc['nombre'] . ' ya es administrador. ' . $enviarEnlace($doc));
         redirigir('/admin/administradores');
     });
 

@@ -121,6 +121,21 @@ $rolElegido = $valores['rol'] ?? 'voluntario';
     </form>
 
     <section class="tarjeta">
+        <h2>Correo</h2>
+        <?php if (VerificacionCorreo::pendiente($doc)): ?>
+            <p><span class="estado estado--reservada">Sin confirmar</span></p>
+            <p class="texto-suave">La persona no puede iniciar sesión hasta abrir el enlace que se envió a <?= e($doc['correo']) ?>. El enlace vence en <?= VerificacionCorreo::HORAS_VIGENCIA ?> horas; al enviar otro, el anterior deja de servir.</p>
+            <form method="post" action="<?= e(url('/admin/usuarios/' . $doc['_id'] . '/verificacion')) ?>">
+                <?= csrf_campo() ?>
+                <button class="boton boton--secundario" type="submit">Reenviar enlace</button>
+            </form>
+        <?php else: ?>
+            <p><span class="estado estado--confirmada">Confirmado</span>
+                <?php if (!empty($doc['correoVerificadoEn'])): ?><span class="texto-suave">el <?= e(fecha_cr($doc['correoVerificadoEn'])) ?></span><?php endif; ?></p>
+        <?php endif; ?>
+    </section>
+
+    <section class="tarjeta">
         <h2>Estado de la cuenta</h2>
         <?php if (UsuarioRepositorio::estaActivo($doc)): ?>
             <p class="texto-suave">Al desactivarla, la persona no puede iniciar sesión y su sesión abierta se cierra. Su historial de inscripciones y horas se conserva.</p>
