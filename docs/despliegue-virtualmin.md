@@ -10,6 +10,8 @@ Por SSH:
 ```bash
 php -v                          # 8.1 o superior
 php -m | grep -E "mongodb|redis" # deben aparecer las dos
+php -m | grep openssl            # para llamar a Mailjet por HTTPS
+php -r 'var_dump((bool) ini_get("allow_url_fopen"));'   # true: la llamada a Mailjet usa file_get_contents
 ```
 
 Sin SSH: subir un archivo `info.php` con `<?php phpinfo();`, abrirlo, buscar las secciones
@@ -50,11 +52,21 @@ chmod -R u+rwX,g+rwX storage public/uploads
 - `REDIS_PREFIX=grupoX:voluntacr:` con el número real del grupo.
 - `APP_DEBUG=false` en el servidor.
 - `APP_BASE`: vacío si el sitio está en la raíz del dominio; `/voluntacr` si está en una subcarpeta.
+- `APP_URL`: la dirección pública del sitio sin la subcarpeta (por ejemplo `https://su-sitio.cr`).
+  Es la base de los enlaces de los correos; si queda mal, los enlaces de confirmación no abren.
+- `MAILJET_API_KEY` y `MAILJET_API_SECRET`: en Mailjet, *Account settings > API Key Management*.
+- `CORREO_REMITENTE`: una dirección validada en Mailjet (*Account settings > Senders & Domains*).
+  Con un dominio propio conviene configurar también SPF y DKIM ahí mismo, para que los correos no
+  terminen en correo no deseado.
+
+Sin las claves de Mailjet nadie recibe el enlace de confirmación, y las cuentas nuevas solo se
+pueden confirmar con el enlace que la página muestra en modo sin correo (D23). En el servidor
+tienen que estar configuradas.
 
 ## 4. Crear el esquema y cargar datos
 
 ```bash
-php scripts/probar_conexiones.php
+php scripts/probar_conexiones.php          # también prueba Mailjet, sin enviar ningún correo
 php scripts/crear_esquema.php
 php scripts/cargar_datos.php --limpiar     # datos de demo, incluye admin@voluntacr.test
 ```
@@ -71,7 +83,11 @@ En Virtualmin: *System → Scheduled Cron Jobs* (o `crontab -e`):
 
 ```
 * * * * * php /home/USUARIO/voluntacr/scripts/liberar_reservas.php >> /home/USUARIO/voluntacr/storage/cron.log 2>&1
+*/5 * * * * php /home/USUARIO/voluntacr/scripts/enviar_correos.php >> /home/USUARIO/voluntacr/storage/cron.log 2>&1
 ```
+
+La segunda línea reintenta los correos de los avisos que fallaron (Mailjet no respondió o rechazó el
+envío). Los avisos ya están en el portal; el cron solo se encarga del correo.
 
 ## 6. Límites de subida
 
