@@ -52,17 +52,24 @@ return function (Router $router): void {
     $router->get('/actividades/{id}', function (string $id): void {
         $actividad = ActividadRepositorio::buscar($id);
         $usuario = Sesion::usuario();
-        if ($actividad === null || ($actividad['estado'] !== 'publicada' && !ActividadRepositorio::esPropia($actividad, $usuario))) {
+        // Los borradores solo los ve su organización. Las canceladas no salen en el portal, pero se
+        // pueden abrir por enlace, como el del aviso de cancelación, y dicen que se cancelaron.
+        if ($actividad === null || ($actividad['estado'] === 'borrador' && !ActividadRepositorio::esPropia($actividad, $usuario))) {
             abortar(404, 'Esa actividad no existe o ya no está publicada.');
         }
         // Otros módulos pueden actualizar datos antes de mostrarla (p. ej., liberar reservas vencidas).
         if (array_sum(array_map('intval', Ganchos::ejecutar('actividad.antes_de_ver', $actividad))) > 0) {
             $actividad = ActividadRepositorio::buscar($id);
         }
+        $esPropia = ActividadRepositorio::esPropia($actividad, $usuario);
+        // Las visitas de la organización que la publicó no cuentan.
+        if (!$esPropia) {
+            ActividadRepositorio::registrarVisita((string) $actividad['_id']);
+        }
         vista('actividades/detalle', [
             'a'          => $actividad,
             'usuario'    => $usuario,
-            'esPropia'   => ActividadRepositorio::esPropia($actividad, $usuario),
+            'esPropia'   => $esPropia,
             'panel'      => Ganchos::html('actividad.panel', $actividad, $usuario),
         ], $actividad['titulo']);
     });
@@ -71,9 +78,11 @@ return function (Router $router): void {
 
     $router->get('/panel', function (): void {
         $usuario = Sesion::requiere('coordinador');
+        $actividades = ActividadRepositorio::deOrganizacion($usuario['organizacion']['id']);
         vista('actividades/panel', [
             'usuario'     => $usuario,
-            'actividades' => ActividadRepositorio::deOrganizacion($usuario['organizacion']['id']),
+            'actividades' => $actividades,
+            'visitas'     => ActividadRepositorio::visitas(array_map(fn(array $a) => (string) $a['_id'], $actividades)),
         ], 'Panel de mi organización');
     });
 

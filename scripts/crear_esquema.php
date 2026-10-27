@@ -54,6 +54,21 @@ $validadores = [
             'actualizadoPor' => ['bsonType' => 'objectId'],
             // Las sesiones iniciadas antes de esta fecha se cierran (contraseña restablecida, cuenta desactivada).
             'sesionesValidasDesde' => ['bsonType' => 'date'],
+            // Correo confirmado con el enlace de Mailjet (D23). Si falta el campo, la cuenta está confirmada.
+            'correoVerificado'   => ['bsonType' => 'bool'],
+            'correoVerificadoEn' => ['bsonType' => 'date'],
+            // Enlace de confirmación vigente: solo se guarda el SHA-256 del token.
+            'verificacion'       => [
+                'bsonType'   => ['object', 'null'],
+                'required'   => ['tokenHash', 'expiraEn', 'enviadaEn'],
+                'properties' => [
+                    'tokenHash' => ['bsonType' => 'string', 'pattern' => '^[a-f0-9]{64}$'],
+                    'expiraEn'  => ['bsonType' => 'date'],
+                    'enviadaEn' => ['bsonType' => 'date'],
+                ],
+            ],
+            // Recibir los avisos también por correo. Si falta el campo, sí.
+            'avisosPorCorreo'    => ['bsonType' => 'bool'],
         ],
     ]],
 
@@ -127,6 +142,45 @@ $validadores = [
             'creadaEn'     => ['bsonType' => 'date'],
         ],
     ]],
+
+    // Un documento por destinatario (D24): la bandeja de cada persona y su estado de lectura.
+    'notificaciones' => ['$jsonSchema' => [
+        'bsonType' => 'object',
+        'required' => ['usuarioId', 'envioId', 'tipo', 'titulo', 'mensaje', 'leidaEn', 'correo', 'creadaEn'],
+        'properties' => [
+            'usuarioId'   => ['bsonType' => 'objectId'],
+            // Agrupa los documentos de un mismo envío, uno por persona.
+            'envioId'     => ['bsonType' => 'objectId'],
+            'tipo'        => ['enum' => array_keys(Catalogos::TIPOS_AVISO)],
+            'titulo'      => ['bsonType' => 'string', 'minLength' => 3, 'maxLength' => 150],
+            'mensaje'     => ['bsonType' => 'string', 'minLength' => 1, 'maxLength' => 2000],
+            'actividadId' => ['bsonType' => ['objectId', 'null']],
+            'actividad'   => ['bsonType' => ['object', 'null'], 'required' => ['titulo', 'fechaInicio']],
+            'enlace'      => ['bsonType' => ['string', 'null'], 'maxLength' => 300],
+            // Quién escribió el mensaje; null en los avisos automáticos.
+            'remitente'   => [
+                'bsonType'   => ['object', 'null'],
+                'required'   => ['id', 'nombre'],
+                'properties' => [
+                    'id'           => ['bsonType' => 'objectId'],
+                    'nombre'       => ['bsonType' => 'string'],
+                    'organizacion' => ['bsonType' => 'string'],
+                ],
+            ],
+            'leidaEn'     => $fechaOpcional,
+            'creadaEn'    => ['bsonType' => 'date'],
+            'correo'      => [
+                'bsonType'   => 'object',
+                'required'   => ['estado', 'intentos'],
+                'properties' => [
+                    'estado'    => ['enum' => ['pendiente', 'enviado', 'fallido', 'omitido']],
+                    'intentos'  => $entero + ['minimum' => 0],
+                    'enviadoEn' => $fechaOpcional,
+                    'motivo'    => ['bsonType' => ['string', 'null'], 'maxLength' => 300],
+                ],
+            ],
+        ],
+    ]],
 ];
 
 $indices = [
@@ -154,6 +208,16 @@ $indices = [
         ['key' => ['actividadId' => 1, 'estado' => 1], 'name' => 'inscritos_actividad'],
         // Historial y horas de un voluntario.
         ['key' => ['voluntarioId' => 1, 'actividad.fechaInicio' => -1], 'name' => 'historial_voluntario'],
+    ],
+    'notificaciones' => [
+        // Bandeja de cada persona, del aviso más reciente al más antiguo.
+        ['key' => ['usuarioId' => 1, 'creadaEn' => -1], 'name' => 'bandeja_usuario'],
+        // Contador de avisos sin leer de la cabecera.
+        ['key' => ['usuarioId' => 1, 'leidaEn' => 1], 'name' => 'sin_leer'],
+        // Historial de avisos de una actividad, en el panel del coordinador.
+        ['key' => ['actividadId' => 1, 'creadaEn' => -1], 'name' => 'avisos_actividad'],
+        // Correos por reintentar (scripts/enviar_correos.php) y conteos de /estado.
+        ['key' => ['correo.estado' => 1, 'creadaEn' => 1], 'name' => 'correos_pendientes'],
     ],
 ];
 
