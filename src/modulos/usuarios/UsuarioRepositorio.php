@@ -10,6 +10,7 @@ use MongoDB\Driver\Exception\BulkWriteException;
  *
  * Roles: voluntario (se registra solo), coordinador (de una organización) y admin.
  * Las cuentas no se borran: se desactivan (activo = false) para no perder el historial.
+ * Las que se crean desde la web no pueden iniciar sesión hasta confirmar su correo (VerificacionCorreo).
  */
 final class UsuarioRepositorio
 {
@@ -83,16 +84,17 @@ final class UsuarioRepositorio
         return [$datos, $errores];
     }
 
-    /** Inserta una cuenta. Devuelve [documento | null, errores]. */
+    /** Inserta una cuenta, que queda sin confirmar el correo. Devuelve [documento | null, errores]. */
     public static function insertar(array $datos, string $rol, ?array $organizacion = null, ?string $creadoPor = null): array
     {
         $documento = $datos + [
-            'rol'          => $rol,
-            'provincia'    => null,
-            'organizacion' => $organizacion,
-            'activo'       => true,
-            'creadoEn'     => Mongo::ahora(),
-            'creadoPor'    => $creadoPor ? Mongo::id($creadoPor) : null,
+            'rol'              => $rol,
+            'provincia'        => null,
+            'organizacion'     => $organizacion,
+            'activo'           => true,
+            'correoVerificado' => false,
+            'creadoEn'         => Mongo::ahora(),
+            'creadoPor'        => $creadoPor ? Mongo::id($creadoPor) : null,
         ];
         try {
             $documento['_id'] = Mongo::get()->insertar('usuarios', $documento);
@@ -105,7 +107,10 @@ final class UsuarioRepositorio
         return [$documento, []];
     }
 
-    /** Registro público: solo crea voluntarios. Devuelve [usuario para la sesión | null, errores]. */
+    /**
+     * Registro público: solo crea voluntarios, sin iniciar sesión (primero deben confirmar el correo).
+     * Devuelve [documento | null, errores].
+     */
     public static function registrar(array $entrada): array
     {
         [$datos, $errores] = self::validar($entrada, ['nombre', 'correo', 'provincia', 'clave']);
@@ -117,11 +122,13 @@ final class UsuarioRepositorio
             $errores['correo'] .= ' Inicie sesión.';
             return [null, $errores];
         }
-        return [self::aSesion($documento), []];
+        return [$documento, []];
     }
 
     /**
-     * Revisa correo y contraseña. Devuelve [usuario | null, mensaje de error].
+     * Revisa correo y contraseña. Devuelve [usuario | null, mensaje de error, id de la cuenta | null].
+     * El tercer valor es el id cuando la contraseña es correcta pero el correo no está confirmado.
+     * Esa revisión va después de la contraseña: así no revela qué correos tienen cuenta.
      * Redis cuenta los intentos fallidos por correo (bloqueo de 15 minutos tras 5 fallos).
      * Si Redis no está, no hay límite de intentos pero el inicio de sesión sigue funcionando.
      */
@@ -133,7 +140,7 @@ final class UsuarioRepositorio
 
         $intentos = (int) $rs->usar(fn(Redis $r) => $r->get($claveIntentos), 0);
         if ($intentos >= self::INTENTOS_MAXIMOS) {
-            return [null, 'Demasiados intentos fallidos con este correo. Espere 15 minutos e inténtelo de nuevo.'];
+            return [null, 'Demasiados intentos fallidos con este correo. Espere 15 minutos e inténtelo de nuevo.', null];
         }
 
         $doc = Mongo::get()->buscarUno('usuarios', ['correo' => $correo]);
@@ -142,24 +149,29 @@ final class UsuarioRepositorio
                 $r->incr($claveIntentos);
                 $r->expire($claveIntentos, self::BLOQUEO_SEG);
             });
-            return [null, 'El correo o la contraseña no coinciden.'];
+            return [null, 'El correo o la contraseña no coinciden.', null];
         }
         $rs->usar(fn(Redis $r) => $r->del($claveIntentos));
 
         if (!self::estaActivo($doc)) {
-            return [null, 'Esta cuenta está desactivada. Si cree que es un error, comuníquese con la administración.'];
+            return [null, 'Esta cuenta está desactivada. Si cree que es un error, comuníquese con la administración.', null];
         }
-        return [self::aSesion($doc), ''];
+        if (VerificacionCorreo::pendiente($doc)) {
+            return [null, 'Confirme su correo antes de iniciar sesión.', (string) $doc['_id']];
+        }
+        return [self::aSesion($doc), '', null];
     }
 
     /**
-     * Revisa que la cuenta de la sesión siga existiendo y activa, y que su contraseña no se haya
-     * restablecido después de iniciar sesión. Devuelve los datos actualizados o null para cerrarla.
+     * Revisa que la cuenta de la sesión siga existiendo, activa y con el correo confirmado, y que su
+     * contraseña no se haya restablecido después de iniciar sesión. Devuelve los datos actualizados o
+     * null para cerrarla.
      */
     public static function revisarSesion(array $sesion, int $iniciadaEnMs): ?array
     {
         $doc = self::buscar($sesion['id']);
-        if ($doc === null || !self::estaActivo($doc)) {
+        // El correo vuelve a quedar sin confirmar cuando la administración lo cambia.
+        if ($doc === null || !self::estaActivo($doc) || VerificacionCorreo::pendiente($doc)) {
             return null;
         }
         $desde = $doc['sesionesValidasDesde'] ?? null;
@@ -171,11 +183,15 @@ final class UsuarioRepositorio
 
     /* ---------- Mi cuenta ---------- */
 
-    public static function actualizarPerfil(ObjectId $id, array $entrada): array
+    /** $conAvisos: guarda también si quiere recibir los avisos por correo (solo voluntarios). */
+    public static function actualizarPerfil(ObjectId $id, array $entrada, bool $conAvisos = false): array
     {
         [$datos, $errores] = self::validar($entrada, ['nombre', 'provincia']);
         if ($errores) {
             return [null, $errores];
+        }
+        if ($conAvisos) {
+            $datos['avisosPorCorreo'] = !empty($entrada['avisosPorCorreo']);
         }
         Mongo::get()->actualizar('usuarios', ['_id' => $id], ['$set' => $datos + ['actualizadoEn' => Mongo::ahora(), 'actualizadoPor' => $id]]);
         return [self::aSesion(Mongo::get()->buscarUno('usuarios', ['_id' => $id])), []];

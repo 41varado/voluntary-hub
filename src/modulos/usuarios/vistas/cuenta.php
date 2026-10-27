@@ -34,6 +34,16 @@ $error = fn(array $errores, string $campo) => isset($errores[$campo]) ? '<p clas
             </select>
             <?= $error($erroresPerfil, 'provincia') ?>
         </div>
+        <?php if ($doc['rol'] === 'voluntario'): ?>
+            <div class="campo">
+                <span class="campo__etiqueta">Avisos de las actividades</span>
+                <label class="opcion">
+                    <input type="checkbox" name="avisosPorCorreo" value="1"<?= !empty($valores['avisosPorCorreo']) ? ' checked' : '' ?>>
+                    Recibirlos también por correo
+                </label>
+                <p class="campo__ayuda">Cancelaciones, cambios, horas acreditadas y mensajes de las organizaciones. Siempre quedan en «Avisos».</p>
+            </div>
+        <?php endif; ?>
         <div><button class="boton" type="submit">Guardar datos</button></div>
     </form>
 

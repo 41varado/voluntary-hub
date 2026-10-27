@@ -144,3 +144,149 @@ Registro de qué se decidió, qué alternativas había y por qué. Se agrega una
 - **Por qué:** cada módulo tiene una persona responsable (D8), así que una rama por integrante
   alcanza y evita choques. Con el pull request alguien más lee cada cambio antes de que llegue a
   `main`, y `main` queda estable para crear los tags de cada seguimiento.
+
+## D17. Lo que el cliente integrado de Redis no tiene se ejecuta con `EVAL`
+
+- **Decisión:** los comandos de hash, sorted set y stream (`HINCRBY`, `HGETALL`, `ZINCRBY`, `ZADD`,
+  `ZREVRANGE`, `XADD`, `XREVRANGE`…) se ejecutan dentro de scripts Lua con `EVAL`, que existe tanto
+  en la extensión phpredis como en el cliente integrado (`src/Nucleo/RedisPolyfill.php`).
+- **Alternativas:** agregar cada comando al cliente integrado; exigir la extensión phpredis en el
+  servidor; usar solo strings.
+- **Por qué:** el mismo código funciona con los dos clientes, y el cliente integrado no crece con
+  cada estructura nueva. Además, cada script hace varias operaciones en un solo viaje a Redis y sin
+  que otra solicitud se meta en medio: sumar una visita y renovar su vencimiento, o anotar un evento
+  y renovar el del stream. Con solo strings no se cumplirían las tres estructuras que pide el curso.
+- **Costo:** si el Redis del servidor no permitiera `EVAL`, estas funciones se comportarían como con
+  Redis caído (D18), y las reservas seguirían solo con MongoDB.
+
+## D18. Visitas, ranking y bitácora de eventos son datos de apoyo
+
+- **Decisión:** las visitas por actividad y día (hash `actividad:{id}:visitas`), el ranking de horas
+  (sorted set `ranking:horas`) y la bitácora de inscripciones (stream `eventos`) son datos de apoyo.
+  Si Redis no responde, no se cuentan visitas ni se anotan eventos, y el ranking se calcula en
+  MongoDB; las reservas y la asistencia se guardan igual.
+- **Alternativas:** escribirlos también en MongoDB; no permitir la operación mientras Redis no
+  responda.
+- **Por qué:** son datos para mostrar (visitas en el panel, puesto en "Mis horas", últimos eventos
+  en `/estado`), no compromisos con nadie. Guardarlos en MongoDB sumaría una escritura a la base
+  principal en cada visita y en cada inscripción, que es justo la carga que Redis le quita. Y
+  detener una reserva porque no se pudo anotar el evento sería peor que perder el evento.
+- **Costo:** las visitas y los eventos son la excepción a la regla de que ningún dato vive solo en
+  Redis ([redis-claves.md](redis-claves.md)): los de mientras Redis no respondía se pierden. El
+  ranking sí se reconstruye desde MongoDB (D20).
+
+## D19. El contador de cupos se confirma en MongoDB antes de rechazar, como máximo cada 15 s
+
+- **Decisión:** cuando el contador de Redis dice que la actividad está llena, la primera solicitud
+  que lo encuentra así (una cada 15 s por actividad, con `SET NX` en `liberando:{actividad}`) libera
+  las reservas vencidas en MongoDB, borra el contador y lo vuelve a cargar. Las demás se rechazan en
+  Redis, como antes.
+- **Alternativas:** confiar en el contador hasta que venza (1 h); confirmar en MongoDB cada rechazo;
+  corregirlo solo con `scripts/reconciliar_cupos.php`.
+- **Por qué:** si alguien cancela mientras Redis no responde, MongoDB devuelve el cupo, pero la clave
+  de Redis no se puede borrar y el contador queda más bajo que el real: la actividad aparecía llena
+  hasta por una hora. Confirmar cada rechazo lo corregiría, pero mandaría a MongoDB todas las
+  solicitudes que sobran en una avalancha, que es justo lo que el contador evita. Con una
+  confirmación cada 15 s el desfase dura poco y MongoDB sigue protegido. Se prueba en EC-04.
+
+## D20. El ranking se reconstruye desde MongoDB cada hora
+
+- **Decisión:** `ranking:horas` vence a la hora. Mientras existe, guardar la asistencia suma o resta
+  horas con `ZINCRBY`; cuando no existe, la siguiente consulta lo reconstruye con una agregación
+  sobre las asistencias y lo vuelve a guardar.
+- **Alternativas:** reconstruirlo en cada consulta; mantenerlo solo con `ZINCRBY`, sin vencimiento;
+  un cron que lo reconstruya.
+- **Por qué:** si una asistencia se guarda con Redis caído, su `ZINCRBY` se pierde y el ranking queda
+  desfasado. Con el vencimiento, el desfase dura como máximo una hora y se corrige solo, sin otro
+  cron en el servidor. Reconstruirlo en cada consulta sería recorrer todas las asistencias cada vez
+  que alguien abre "Mis horas"; sin vencimiento, un desfase quedaría para siempre.
+
+## D21. La asistencia sin conexión se guarda en el navegador
+
+- **Decisión:** al guardar la lista de asistencia, las marcas se guardan primero en el `localStorage`
+  del navegador del coordinador. Si no hay señal, se reenvían solas al volver la conexión, al
+  recargar la página y cada 30 s. Cada envío lleva la lista completa de presentes, así que repetirlo
+  no duplica nada.
+- **Alternativas:** SQLite como tercer motor (perfil C); IndexedDB con un service worker; no permitir
+  pasar lista sin conexión.
+- **Por qué:** cumple lo que prometía D1 sin agregar un tercer motor: la falta de señal ocurre en el
+  navegador del coordinador, y ahí no hay SQLite. Para una lista de casillas, `localStorage` alcanza
+  y funciona en cualquier navegador; un service worker agregaría bastante código para guardar unos
+  pocos identificadores.
+- **Costo:** las marcas quedan solo en ese navegador hasta que se envían. Si el navegador no permite
+  guardarlas (por ejemplo, en algunas ventanas privadas), la página lo avisa y pide no cerrarla.
+
+## D22. Las mediciones fuerzan los planes con `hint` y usan datos temporales
+
+- **Decisión:** `medir_indice.php` compara los planes de la consulta del portal forzándolos con
+  `hint` (`{$natural: 1}` para el recorrido sin índice), sobre 20 000 actividades sintéticas de una
+  organización temporal que se borran al terminar. `medir_cupos.php` también usa una actividad
+  temporal, y las mediciones sin Redis lo apagan solo dentro del script (`REDIS_DESHABILITADO=true`).
+- **Alternativas:** borrar el índice, medir y volver a crearlo; medir solo con los datos de prueba;
+  detener Redis para medir sin él.
+- **Por qué:** borrar un índice o detener Redis afectaría a quien esté usando la base o el Redis
+  compartido en ese momento, y si el script se interrumpe el índice queda sin crear. Con los datos
+  de prueba (unas 40 actividades) todos los planes tardan casi lo mismo y la diferencia no se ve.
+  Con `hint` cada plan se mide sobre los mismos datos, y la semilla fija (2026) genera siempre los
+  mismos, así la medición se puede repetir.
+
+## D23. El correo se confirma con un enlace de Mailjet, y sin confirmarlo no se inicia sesión
+
+- **Decisión:** al crear una cuenta desde la web (registro o administración), la Send API v3.1 de
+  Mailjet le envía un enlace, y hasta abrirlo la cuenta no puede iniciar sesión. El enlace lleva un
+  token al azar de 32 bytes: MongoDB guarda solo su SHA-256, vence en 48 horas y sirve una sola vez.
+  Si la administración cambia el correo de alguien, hay que confirmarlo de nuevo y su sesión abierta
+  se cierra (D12). Las cuentas anteriores, las de los scripts de consola y las de prueba cuentan como
+  confirmadas.
+- **Alternativas:** el verificador de direcciones de Mailjet; dejar entrar sin confirmar y solo
+  impedir las reservas; un código de 6 dígitos para escribir en la página.
+- **Por qué:** el verificador de Mailjet trabaja por listas de contactos, en segundo plano y con
+  créditos de pago: no responde en el momento del registro ni prueba que la dirección sea de quien se
+  registra. El enlace prueba las dos cosas y entra en el plan gratuito. Sin confirmar no se entra
+  porque los avisos (D24) dependen de que el correo sea real. Con el hash, quien lea la base no puede
+  usar los enlaces pendientes. Para pedir otro enlace se usa la cuenta recordada en la sesión del
+  navegador donde se creó o donde se escribió bien la contraseña, nunca un correo escrito en un
+  formulario: así no se puede averiguar qué correos tienen cuenta ni mandarle enlaces a cualquiera.
+  El enlace inicia sesión solo si se abre en ese mismo navegador; si no, pide la contraseña, para
+  que nadie quede dentro de una cuenta que otra persona creó con su correo.
+- **Costo:** sin Mailjet configurado nadie podría entrar, así que en ese caso, y con las direcciones
+  `.test`, el enlace se muestra en la página, en el mismo navegador. Sirve para desarrollo y pruebas,
+  no para producción.
+
+## D24. Un aviso es un documento por destinatario
+
+- **Decisión:** cada aviso se guarda en `notificaciones` como un documento por persona, con una copia
+  del título y del mensaje, su estado de lectura (`leidaEn`) y el estado de su correo. Los
+  documentos de un mismo envío comparten `envioId`. El historial de una actividad (cuántas personas
+  recibieron cada aviso, cuántas lo leyeron y cuántas por correo) sale de una agregación por
+  `envioId`.
+- **Alternativas:** un documento por aviso con un arreglo de quienes lo leyeron; un stream o pub/sub
+  de Redis; solo correo, sin bandeja en el portal.
+- **Por qué:** la bandeja y el contador de no leídos son consultas por `usuarioId`, con su índice y
+  sin unir colecciones. Un arreglo de lecturas crecería con cada actividad grande (hasta 500 cupos)
+  y cada lectura reescribiría el documento del aviso. Como en D15, las cifras del historial se
+  calculan, sin contadores que se puedan desfasar. Redis no sirve como fuente: los avisos son
+  compromisos con las personas y no se pueden perder (D18). Avisar a 500 personas son 500 documentos
+  en una sola escritura (`insertMany`).
+- **Costo:** el texto se repite en cada documento: un mensaje de 2000 caracteres para 500 personas
+  ocupa alrededor de 1 MB.
+
+## D25. El correo sale en la misma solicitud y lo que falla se reintenta desde MongoDB
+
+- **Decisión:** al crear los avisos, el correo se envía enseguida, en lotes de 50 mensajes por
+  llamada a Mailjet y con un tiempo límite de 5 s (`MAILJET_TIMEOUT`). Si Mailjet no responde, los
+  demás lotes no se intentan en esa solicitud. Lo que falla queda como `fallido` en el documento del
+  aviso, y `scripts/enviar_correos.php` (cron cada 5 minutos) lo reintenta hasta 3 veces durante 48
+  horas. Nunca se envía a dominios reservados (`.test`, `.example`, `example.com`…), como los de los
+  datos de prueba. La llamada HTTP usa los streams de PHP, sin Composer ni la extensión curl.
+- **Alternativas:** enviar solo desde el cron; una cola en Redis; la librería oficial de Mailjet con
+  Composer.
+- **Por qué:** casi siempre el correo sale en el momento, sin esperar al cron, y si Mailjet falla la
+  acción del coordinador se guarda igual: el aviso ya está en el portal. La bandeja de salida vive en
+  MongoDB, igual que el vencimiento de las reservas (D3), porque tiene que sobrevivir a una caída de
+  Redis. Dejar de intentar después del primer lote sin respuesta evita que una página espere 5 s por
+  cada lote. Los streams de PHP mantienen la regla de D7: instalar es copiar archivos.
+- **Costo:** el plan gratuito de Mailjet envía 200 correos por día (6000 al mes) y deja en cola, hasta
+  3 días, lo que pasa del límite diario: en una actividad grande cancelada, el correo puede llegar
+  tarde, aunque en el portal el aviso está desde el primer momento. Sin el cron, los correos
+  fallidos no se reintentan.

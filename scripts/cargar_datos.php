@@ -7,8 +7,10 @@
  *   php scripts/cargar_datos.php --limpiar
  *   php scripts/cargar_datos.php --limpiar --voluntarios=200 --semilla=7
  *
- * --limpiar  borra los documentos de las 4 colecciones, las imágenes subidas y las claves
+ * --limpiar  borra los documentos de las 5 colecciones, las imágenes subidas y las claves
  *            de Redis con el prefijo del grupo (con SCAN; nunca FLUSHDB ni FLUSHALL).
+ *
+ * Todas las cuentas quedan con el correo confirmado. Las direcciones .test no reciben correos.
  *
  * Responsable: Persona 4.
  */
@@ -34,7 +36,7 @@ $ahora = time();
 /* ---------- Limpieza ---------- */
 
 if (isset($opciones['limpiar'])) {
-    foreach (['inscripciones', 'actividades', 'usuarios', 'organizaciones'] as $coleccion) {
+    foreach (['notificaciones', 'inscripciones', 'actividades', 'usuarios', 'organizaciones'] as $coleccion) {
         $borrados = $bd->eliminar($coleccion, [], true);
         echo "  - {$coleccion}: {$borrados} documentos borrados\n";
     }
@@ -67,16 +69,17 @@ $nombrePersona = fn() => $azar($nombres['nombres']) . ' ' . $azar($nombres['apel
 $organizaciones = [];
 $usuarios = [];
 $administrador = [
-    '_id'          => new MongoDB\BSON\ObjectId(),
-    'nombre'       => $nombrePersona(),
-    'correo'       => 'admin@voluntacr.test',
-    'claveHash'    => $claveAdmin,
-    'rol'          => 'admin',
-    'provincia'    => null,
-    'organizacion' => null,
-    'activo'       => true,
-    'creadoEn'     => Mongo::fecha($ahora - 120 * 86400),
-    'creadoPor'    => null,
+    '_id'              => new MongoDB\BSON\ObjectId(),
+    'nombre'           => $nombrePersona(),
+    'correo'           => 'admin@voluntacr.test',
+    'claveHash'        => $claveAdmin,
+    'rol'              => 'admin',
+    'provincia'        => null,
+    'organizacion'     => null,
+    'activo'           => true,
+    'correoVerificado' => true,
+    'creadoEn'         => Mongo::fecha($ahora - 120 * 86400),
+    'creadoPor'        => null,
 ];
 foreach ($organizacionesBase as $n => $base) {
     $id = new MongoDB\BSON\ObjectId();
@@ -90,33 +93,35 @@ foreach ($organizacionesBase as $n => $base) {
         'categorias'  => $base['categorias'],
     ];
     $usuarios[] = [
-        '_id'          => new MongoDB\BSON\ObjectId(),
-        'nombre'       => $nombrePersona(),
-        'correo'       => 'coordinador' . ($n + 1) . '@voluntacr.test',
-        'claveHash'    => $claveCoordinador,
-        'rol'          => 'coordinador',
-        'provincia'    => $base['provincia'],
-        'organizacion' => ['id' => $id, 'nombre' => $base['nombre']],
-        'activo'       => true,
-        'creadoEn'     => Mongo::fecha($ahora - 90 * 86400),
-        'creadoPor'    => $administrador['_id'],
+        '_id'              => new MongoDB\BSON\ObjectId(),
+        'nombre'           => $nombrePersona(),
+        'correo'           => 'coordinador' . ($n + 1) . '@voluntacr.test',
+        'claveHash'        => $claveCoordinador,
+        'rol'              => 'coordinador',
+        'provincia'        => $base['provincia'],
+        'organizacion'     => ['id' => $id, 'nombre' => $base['nombre']],
+        'activo'           => true,
+        'correoVerificado' => true,
+        'creadoEn'         => Mongo::fecha($ahora - 90 * 86400),
+        'creadoPor'        => $administrador['_id'],
     ];
 }
 
 $voluntarios = [];
 for ($n = 1; $n <= $cantidadVoluntarios; $n++) {
     $voluntario = [
-        '_id'          => new MongoDB\BSON\ObjectId(),
-        'nombre'       => $nombrePersona(),
-        'correo'       => 'voluntario' . $n . '@voluntacr.test',
-        'claveHash'    => $claveVoluntario,
-        'rol'          => 'voluntario',
-        'provincia'    => $azar(Catalogos::PROVINCIAS),
-        'organizacion' => null,
+        '_id'              => new MongoDB\BSON\ObjectId(),
+        'nombre'           => $nombrePersona(),
+        'correo'           => 'voluntario' . $n . '@voluntacr.test',
+        'claveHash'        => $claveVoluntario,
+        'rol'              => 'voluntario',
+        'provincia'        => $azar(Catalogos::PROVINCIAS),
+        'organizacion'     => null,
         // Una cuenta desactivada para la demo de administración.
-        'activo'       => $n !== $cantidadVoluntarios,
-        'creadoEn'     => Mongo::fecha($ahora - mt_rand(1, 80) * 86400),
-        'creadoPor'    => null,
+        'activo'           => $n !== $cantidadVoluntarios,
+        'correoVerificado' => true,
+        'creadoEn'         => Mongo::fecha($ahora - mt_rand(1, 80) * 86400),
+        'creadoPor'        => null,
     ];
     $voluntarios[] = $voluntario;
     $usuarios[] = $voluntario;
@@ -224,6 +229,46 @@ foreach ($organizaciones as &$organizacion) {
 }
 unset($organizacion);
 
+/* ---------- Avisos de ejemplo ---------- */
+
+// En las dos primeras organizaciones, un mensaje del coordinador a los inscritos de su próxima
+// actividad, para que la bandeja y el historial no empiecen vacíos. No usa números al azar, así los
+// datos anteriores siguen siendo los mismos con cada semilla.
+$notificaciones = [];
+foreach (array_slice($organizaciones, 0, 2) as $o => $organizacion) {
+    $proximas = array_filter($actividades, fn(array $a) => (string) $a['organizacion']['id'] === (string) $organizacion['_id']
+        && $a['estado'] === 'publicada' && $a['fechaInicio']->toDateTime()->getTimestamp() > $ahora + 86400);
+    usort($proximas, fn(array $a, array $b) => (int) (string) $a['fechaInicio'] <=> (int) (string) $b['fechaInicio']);
+    foreach ($proximas as $actividad) {
+        $inscritos = array_values(array_filter($inscripciones, fn(array $i) => (string) $i['actividadId'] === (string) $actividad['_id']
+            && in_array($i['estado'], ['reservada', 'confirmada'], true)));
+        if (!$inscritos) {
+            continue;
+        }
+        $envioId = new MongoDB\BSON\ObjectId();
+        foreach ($inscritos as $k => $inscripcion) {
+            $notificaciones[] = [
+                'usuarioId'   => $inscripcion['voluntarioId'],
+                'envioId'     => $envioId,
+                'tipo'        => 'mensaje',
+                'titulo'      => 'Punto de encuentro y qué llevar',
+                'mensaje'     => 'Nos vemos el ' . fecha_cr($actividad['fechaInicio'], 'dia') . ' en ' . $actividad['lugar']
+                    . ". Lleguen 15 minutos antes para organizar los grupos.\n\nTraigan agua y ropa cómoda. Si ya no puede venir, "
+                    . 'cancele su inscripción para que otra persona aproveche el cupo.',
+                'actividadId' => $actividad['_id'],
+                'actividad'   => ['titulo' => $actividad['titulo'], 'fechaInicio' => $actividad['fechaInicio']],
+                'enlace'      => '/actividades/' . $actividad['_id'],
+                'remitente'   => ['id' => $usuarios[$o]['_id'], 'nombre' => $usuarios[$o]['nombre'], 'organizacion' => $organizacion['nombre']],
+                // La mitad ya lo leyó, para que el historial muestre lecturas.
+                'leidaEn'     => $k % 2 === 0 ? Mongo::fecha($ahora - 86400) : null,
+                'creadaEn'    => Mongo::fecha($ahora - 2 * 86400),
+                'correo'      => ['estado' => 'omitido', 'intentos' => 0, 'enviadoEn' => null, 'motivo' => 'dominio_reservado'],
+            ];
+        }
+        break;
+    }
+}
+
 $usuarios[] = $administrador;
 
 $insertados = [
@@ -231,6 +276,7 @@ $insertados = [
     'usuarios'       => $bd->insertarVarios('usuarios', $usuarios),
     'actividades'    => $bd->insertarVarios('actividades', $actividades),
     'inscripciones'  => $bd->insertarVarios('inscripciones', $inscripciones),
+    'notificaciones' => $bd->insertarVarios('notificaciones', $notificaciones),
 ];
 
 // El listado en caché ya no corresponde a los datos nuevos.
@@ -244,4 +290,5 @@ echo "  Administración: admin@voluntacr.test  clave: Admin2026\n";
 echo "  Coordinación: coordinador1@voluntacr.test … coordinador" . count($organizaciones) . "@voluntacr.test  clave: Coordina2026\n";
 echo "  Voluntarios:  voluntario1@voluntacr.test … voluntario{$cantidadVoluntarios}@voluntacr.test  clave: Voluntario2026\n";
 echo "  (voluntario{$cantidadVoluntarios} está desactivada para la demo de administración)\n";
+echo "  Todas tienen el correo confirmado; las direcciones .test no reciben correos.\n";
 echo "  Semilla: {$semilla}\n";
