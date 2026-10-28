@@ -3,6 +3,14 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Una versión por
 seguimiento del curso.
 
+## [Sin publicar]
+
+### Corregido
+- Al iniciar sesión, la administración y la coordinación podían terminar en «403 Sin permiso»: se
+  las devolvía a la última página que se pidió sin sesión en ese navegador, aunque fuera de otro rol
+  (por ejemplo, la bandeja de avisos de un voluntario). Ahora solo se vuelve a esa página si la
+  cuenta tiene el rol que pide; si no, va al inicio de su rol.
+
 ## [0.3.0] - 2026-10-27
 
 ### Agregado

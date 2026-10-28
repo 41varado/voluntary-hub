@@ -112,7 +112,7 @@ return function (Router $router): void {
 
     $router->get('/ingresar', function () use ($destinoSeguro): void {
         if (consulta('volver') !== '') {
-            $_SESSION['volver_a'] = $destinoSeguro(consulta('volver'));
+            $_SESSION['volver_a'] = ['ruta' => $destinoSeguro(consulta('volver')), 'rol' => null];
         }
         vista('usuarios/ingresar', ['correo' => '', 'error' => ''], 'Iniciar sesión');
     });
@@ -128,8 +128,12 @@ return function (Router $router): void {
             vista('usuarios/ingresar', ['correo' => entrada('correo'), 'error' => $error], 'Iniciar sesión', 401);
             return;
         }
-        $volver = $destinoSeguro($_SESSION['volver_a'] ?? null);
+        // Vuelve a la página que se pidió sin sesión si esta cuenta puede abrirla. Si no (por ejemplo,
+        // alguien abrió /avisos en este navegador y entra la administración), va al inicio de su rol.
+        $pedida = $_SESSION['volver_a'] ?? null;
         unset($_SESSION['volver_a']);
+        $rolPedido = $pedida['rol'] ?? null;
+        $volver = ($rolPedido === null || $rolPedido === $usuario['rol']) ? $destinoSeguro($pedida['ruta'] ?? null) : '/';
         Sesion::iniciarComo($usuario);
         flash('exito', 'Hola, ' . $usuario['nombre'] . '.');
         redirigir($volver !== '/' ? $volver : ($inicioPorRol[$usuario['rol']] ?? '/'));
