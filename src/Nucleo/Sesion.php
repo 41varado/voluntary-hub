@@ -53,7 +53,8 @@ final class Sesion
     {
         $usuario = self::usuario();
         if ($usuario === null) {
-            $_SESSION['volver_a'] = $_SERVER['REQUEST_URI'] ?? '/';
+            // Con el rol que pide la página: al iniciar sesión solo se vuelve a ella si la cuenta lo tiene.
+            $_SESSION['volver_a'] = ['ruta' => $_SERVER['REQUEST_URI'] ?? '/', 'rol' => $rol];
             flash('aviso', 'Inicie sesión para continuar.');
             redirigir('/ingresar');
         }
