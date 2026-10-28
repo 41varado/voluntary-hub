@@ -19,7 +19,7 @@ $describe = fn(string $campo) => isset($errores[$campo]) ? ' aria-describedby="e
 
 <div class="medio">
     <form class="tarjeta formulario" method="post" action="<?= e(url('/panel/actividades/' . $id . '/avisos')) ?>" novalidate
-          data-confirmar="¿Enviar este aviso a <?= e(plural($inscritos, 'persona', 'personas')) ?>?">
+          data-confirmar="¿Enviar este aviso a <?= e(plural($inscritos, 'persona', 'personas')) ?>?" data-confirmar-estilo="principal">
         <?= csrf_campo() ?>
         <h2>Enviar un aviso a las personas inscritas</h2>
         <p class="texto-suave">Les llega a todas en «Avisos», dentro del portal, y por correo a quienes no desactivaron

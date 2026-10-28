@@ -5,6 +5,13 @@ seguimiento del curso.
 
 ## [Sin publicar]
 
+### Cambiado
+- Las confirmaciones (cancelar o eliminar una actividad, eliminar una imagen, desactivar una cuenta,
+  enviar un aviso y cancelar una inscripción) se hacen en un diálogo con el diseño de la aplicación
+  y ya no en la ventana del navegador.
+- Iniciar sesión, subir imágenes y restablecer una contraseña muestran sus errores en la página, como
+  los demás formularios, en vez de los globos de validación del navegador.
+
 ### Corregido
 - Al iniciar sesión, la administración y la coordinación podían terminar en «403 Sin permiso»: se
   las devolvía a la última página que se pidió sin sesión en ese navegador, aunque fuera de otro rol

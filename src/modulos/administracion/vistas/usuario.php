@@ -103,7 +103,7 @@ $rolElegido = $valores['rol'] ?? 'voluntario';
 </form>
 
 <?php if (!$esNuevo): ?>
-    <form class="tarjeta formulario" method="post" action="<?= e(url('/admin/usuarios/' . $doc['_id'] . '/clave')) ?>">
+    <form class="tarjeta formulario" method="post" action="<?= e(url('/admin/usuarios/' . $doc['_id'] . '/clave')) ?>" novalidate>
         <?= csrf_campo() ?>
         <h2>Restablecer contraseña</h2>
         <p class="texto-suave">Úselo si la persona olvidó su contraseña. Sus sesiones abiertas se cierran.</p>

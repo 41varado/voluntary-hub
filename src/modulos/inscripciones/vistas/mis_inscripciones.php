@@ -28,7 +28,7 @@ $nombres = ['reservada' => 'Por confirmar', 'confirmada' => 'Confirmada', 'cance
                             <button class="boton boton--pequeno" type="submit">Confirmar cupo</button>
                         </form>
                     <?php endif; ?>
-                    <form method="post" action="<?= e(url('/inscripciones/' . $i['_id'] . '/cancelar')) ?>" data-confirmar="¿Cancelar su inscripción? Su cupo quedará libre para otra persona.">
+                    <form method="post" action="<?= e(url('/inscripciones/' . $i['_id'] . '/cancelar')) ?>" data-confirmar="¿Cancelar su inscripción? Su cupo quedará libre para otra persona." data-confirmar-boton="Cancelar inscripción">
                         <?= csrf_campo() ?><input type="hidden" name="volver" value="lista">
                         <button class="boton-enlace" type="submit">Cancelar</button>
                     </form>

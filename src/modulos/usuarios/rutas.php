@@ -118,6 +118,11 @@ return function (Router $router): void {
     });
 
     $router->post('/ingresar', function () use ($destinoSeguro, $inicioPorRol, $recordarPendiente): void {
+        // El formulario no usa la validación del navegador: los errores se muestran en la página.
+        if (entrada('correo') === '' || (string) ($_POST['clave'] ?? '') === '') {
+            vista('usuarios/ingresar', ['correo' => entrada('correo'), 'error' => 'Escriba su correo y su contraseña.'], 'Iniciar sesión', 422);
+            return;
+        }
         [$usuario, $error, $sinConfirmar] = UsuarioRepositorio::autenticar(entrada('correo'), (string) ($_POST['clave'] ?? ''));
         if ($sinConfirmar !== null) {
             $recordarPendiente($sinConfirmar);

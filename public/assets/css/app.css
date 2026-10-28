@@ -138,6 +138,23 @@ img { max-width: 100%; display: block; }
 .acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
 .acciones form { margin: 0; }
 
+/* ---------- Diálogo de confirmación (app.js, en lugar de window.confirm) ---------- */
+
+.dialogo {
+    width: min(30rem, calc(100% - 2rem)); padding: 0;
+    border: 0; border-top: 6px solid var(--guayacan); border-radius: var(--radio);
+    background: var(--blanco); color: var(--tinta);
+    box-shadow: 0 1.25rem 3rem rgba(15, 51, 41, 0.3);
+}
+.dialogo[open] { animation: dialogo-aparece 0.15s ease-out; }
+/* Con el color escrito: ::backdrop no hereda las variables en los navegadores de antes de 2024. */
+.dialogo::backdrop { background: rgba(15, 51, 41, 0.55); }
+.dialogo__cuerpo { padding: 1.4rem 1.5rem 1.5rem; }
+.dialogo__titulo { font-size: 1.35rem; margin: 0; }
+.dialogo__detalle { color: var(--musgo); margin: 0.5rem 0 0; }
+.dialogo__acciones { justify-content: flex-end; margin-top: 1.4rem; }
+@keyframes dialogo-aparece { from { opacity: 0; transform: translateY(0.5rem); } }
+
 /* ---------- Avisos ---------- */
 
 .avisos { margin-bottom: 1.5rem; display: grid; gap: 0.5rem; }
@@ -371,6 +388,7 @@ input[type="file"] { font: inherit; }
     .barra { grid-template-columns: 1fr auto; }
     .barra__pista { grid-column: 1 / -1; grid-row: 2; }
     .pie a { margin-left: 0; margin-right: 1rem; }
+    .dialogo__acciones { flex-direction: column-reverse; align-items: stretch; }
 }
 
 @media (prefers-reduced-motion: reduce) {

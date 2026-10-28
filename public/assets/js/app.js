@@ -2,13 +2,77 @@
 (function () {
     'use strict';
 
-    // Pide confirmación antes de enviar formularios delicados: <form data-confirmar="¿Seguro?">
-    document.addEventListener('submit', function (evento) {
-        var mensaje = evento.target.getAttribute('data-confirmar');
-        if (mensaje && !window.confirm(mensaje)) {
-            evento.preventDefault();
+    // Pide confirmación antes de enviar formularios delicados, en un diálogo de la página (no con
+    // window.confirm): <form data-confirmar="¿Pregunta? Detalle opcional.">. El botón que confirma
+    // dice lo de data-confirmar-boton o, si falta, lo mismo que el botón del formulario. Es rojo,
+    // salvo con data-confirmar-estilo="principal". Sin <dialog>, el formulario se envía sin preguntar.
+    (function () {
+        var dialogo = document.createElement('dialog');
+        if (typeof dialogo.showModal !== 'function') {
+            return;
         }
-    });
+        dialogo.className = 'dialogo';
+        dialogo.setAttribute('role', 'alertdialog');
+        dialogo.setAttribute('aria-labelledby', 'dialogo-titulo');
+        dialogo.setAttribute('aria-describedby', 'dialogo-detalle');
+        dialogo.innerHTML = '<div class="dialogo__cuerpo">'
+            + '<h2 class="dialogo__titulo" id="dialogo-titulo"></h2>'
+            + '<p class="dialogo__detalle" id="dialogo-detalle"></p>'
+            + '<div class="acciones dialogo__acciones">'
+            + '<button class="boton boton--secundario" type="button" data-dialogo-volver autofocus>Volver</button>'
+            + '<button type="button" data-dialogo-confirmar></button>'
+            + '</div></div>';
+        document.body.appendChild(dialogo);
+        var titulo = dialogo.querySelector('.dialogo__titulo');
+        var detalle = dialogo.querySelector('.dialogo__detalle');
+        var confirmar = dialogo.querySelector('[data-dialogo-confirmar]');
+        var pendiente = null;  // formulario y botón de la última vez que se abrió el diálogo
+        var confirmado = null; // formulario que ya se confirmó: su envío pasa sin preguntar de nuevo
+
+        document.addEventListener('submit', function (evento) {
+            var formulario = evento.target;
+            var mensaje = formulario.getAttribute('data-confirmar');
+            if (!mensaje || formulario === confirmado) {
+                return;
+            }
+            evento.preventDefault();
+            var boton = evento.submitter || formulario.querySelector('[type="submit"]');
+            // La pregunta va de título y lo que sigue, debajo.
+            var partes = mensaje.match(/^([^?]*\?)\s*([\s\S]*)$/) || [mensaje, mensaje, ''];
+            titulo.textContent = partes[1];
+            detalle.textContent = partes[2];
+            detalle.hidden = partes[2] === '';
+            confirmar.textContent = formulario.getAttribute('data-confirmar-boton')
+                || (boton ? boton.textContent.trim() : '') || 'Continuar';
+            confirmar.className = formulario.getAttribute('data-confirmar-estilo') === 'principal'
+                ? 'boton' : 'boton boton--peligro';
+            pendiente = { formulario: formulario, boton: boton };
+            dialogo.showModal();
+        });
+
+        // Se decide en el clic y no en el evento close, que llega después: si el diálogo se cierra y
+        // se vuelve a abrir enseguida, ese close atrasado no debe afectar la nueva pregunta.
+        confirmar.addEventListener('click', function () {
+            var envio = pendiente;
+            dialogo.close();
+            confirmado = envio.formulario;
+            if (envio.formulario.requestSubmit) {
+                envio.formulario.requestSubmit(envio.boton || undefined);
+            } else {
+                envio.formulario.submit();
+            }
+            confirmado = null;
+        });
+        // «Volver», Esc (lo hace el navegador) o un clic en el fondo oscuro cierran sin enviar.
+        dialogo.querySelector('[data-dialogo-volver]').addEventListener('click', function () {
+            dialogo.close();
+        });
+        dialogo.addEventListener('click', function (evento) {
+            if (evento.target === dialogo) {
+                dialogo.close();
+            }
+        });
+    })();
 
     // Galería del detalle: las miniaturas cambian la imagen principal.
     document.querySelectorAll('[data-galeria]').forEach(function (galeria) {
