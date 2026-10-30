@@ -196,7 +196,9 @@ LUA;
         }
 
         Ganchos::ejecutar('cupos.cambiaron', (string) $actividad);
-        $resultado = self::resultado(true, 'Cupo reservado. Confírmelo en los próximos ' . self::minutosReserva() . ' minutos; si no, se libera para otra persona.', $motor, $inicio, (string) $inscripcion);
+        $minutos = self::minutosReserva();
+        $plazo = $minutos === 1 ? 'en el próximo minuto' : "en los próximos {$minutos} minutos";
+        $resultado = self::resultado(true, "Cupo reservado. Confírmelo {$plazo}; si no, se libera para otra persona.", $motor, $inicio, (string) $inscripcion);
         self::anotarEvento('reserva', $actividad, $motor, $resultado['ms']);
         return $resultado;
     }

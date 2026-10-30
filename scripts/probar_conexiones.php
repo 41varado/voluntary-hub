@@ -15,9 +15,17 @@ require __DIR__ . '/../src/bootstrap.php';
 
 echo "PHP " . PHP_VERSION . "\n";
 echo "  extensión mongodb: " . (extension_loaded('mongodb') ? phpversion('mongodb') : 'NO INSTALADA') . "\n";
-echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'no instalada; se usa el cliente PHP integrado') . "\n\n";
+echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'no instalada; se usa el cliente PHP integrado') . "\n";
+// Los scripts no las usan, pero sin ellas las páginas fallan: mbstring para los textos y fileinfo para
+// revisar las imágenes que se suben.
+$faltan = array_values(array_filter(['mbstring', 'fileinfo'], fn(string $extension) => !extension_loaded($extension)));
+echo match (count($faltan)) {
+    0       => "  extensiones mbstring y fileinfo: activas\n\n",
+    1       => "✘ Falta la extensión {$faltan[0]} de PHP: actívela en php.ini (README, sección Requisitos).\n\n",
+    default => "✘ Faltan las extensiones mbstring y fileinfo de PHP: actívelas en php.ini (README, sección Requisitos).\n\n",
+};
 
-$todoBien = true;
+$todoBien = $faltan === [];
 
 try {
     $mongo = Mongo::get()->ping();

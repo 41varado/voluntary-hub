@@ -19,7 +19,9 @@ El script sigue los pasos por HTTP, con una sesión por cuenta, y al título de 
 prueba le agrega la fecha y la hora de la corrida («Prueba CN-01 1026-2013»).
 
 Los pasos que necesitan pausar o detener un motor no se pueden automatizar en el servidor del curso:
-se hicieron en vivo con el profesor el 20 de octubre y dieron el resultado esperado. De esos pasos no hay evidencia escrita.
+se hicieron en vivo con el profesor el 20 de octubre y dieron el resultado esperado. El 28 de octubre
+se repitieron en la instalación local de la prueba de instalación desde cero (Windows 11, MongoDB
+7.0.14 y Redis 7.2.16), con un navegador automatizado, y quedaron capturas en [img/](img/).
 
 ## Preparación
 
@@ -40,6 +42,15 @@ En Codespaces o Docker:
 
 `pause` congela Redis sin apagarlo: la aplicación espera su tiempo límite (0,5 s) y pasa a modo
 respaldo, igual que cuando el servidor de Redis no contesta.
+
+Sin Docker, como en la corrida local del 28 de octubre:
+
+- **Redis:** `redis-cli CLIENT PAUSE 90000 ALL` lo congela 90 s, igual que `pause`. Mientras dura, ni
+  `CLIENT UNPAUSE` responde: hay que esperar a que termine.
+- **MongoDB:** `mongosh --eval 'db.adminCommand({shutdown: 1})'` lo detiene, y se vuelve a iniciar con
+  `mongod`. Cuando vuelve, la aplicación tarda unos 5 s en usarlo otra vez, porque el controlador de
+  PHP espera ese tiempo antes de reintentar un servidor que falló; mientras tanto, las páginas siguen
+  en 503.
 
 En el servidor del curso no se pueden apagar los motores. Se cambia una línea del `.env` y se
 deshace al terminar:
@@ -65,9 +76,16 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 | 5 | `docker compose stop mongo` y recargar `/estado`. | Tarda unos segundos. "MongoDB no responde"; MongoDB dice "Sin conexión". `curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/estado.json` muestra `503`. | Igual. |
 | 6 | `docker compose start mongo`, esperar unos segundos y recargar. | "Funcionamiento normal". | Igual. |
 
-- **Evidencia:** paso 1 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-01; pasos 2 a 6 sin evidencia escrita.
-- **Estado:** Pasa. El paso 1 lo corrió el script; los pasos 2 a 6 se hicieron en vivo con el profesor.
-- **Fecha y entorno:** paso 1: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 a 6: 2026-10-20, en vivo con el profesor
+- **Evidencia:** paso 1 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-01;
+  en local, [paso 1](img/EC-01-paso-1.png), [paso 2](img/EC-01-paso-2.png), [paso 3](img/EC-01-paso-3.png)
+  y [paso 5](img/EC-01-paso-5.png).
+- **Estado:** Pasa. El paso 1 lo corrió el script; los pasos 2 a 6 se hicieron en vivo con el profesor
+  y se repitieron en local.
+- **Fecha y entorno:** paso 1: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 a 6: 2026-10-20, en vivo con el profesor, y 2026-10-28, instalación local
+- **Notas:** En local, con Redis pausado, `/estado` tardó 559 ms y dijo «Redis no responde (Redis no
+  respondió a tiempo.). Modo respaldo con MongoDB durante 30 s.»; la recarga siguiente tardó 33 ms y
+  dijo «Redis falló hace poco; se volverá a intentar en 29 s.». Con MongoDB detenido, `/estado.json`
+  respondió 503.
 
 ### EC-02 · Con Redis caído, la aplicación sigue funcionando
 
@@ -83,9 +101,12 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 | 4 | Ventana B: **Confirmar cupo** y después **Cancelar mi inscripción**. | Las dos funcionan; al cancelar, el cupo vuelve. | Igual. |
 | 5 | Ventana B: **Salir**. Intentar entrar 6 veces como `voluntario3@voluntacr.test` con una contraseña incorrecta y después con la correcta. | Nunca aparece "Demasiados intentos fallidos…": sin Redis no hay límite (D13). La última vez entra. | Igual. |
 
-- **Evidencia:** sin evidencia escrita; se hizo en vivo con el profesor.
-- **Estado:** Pasa, en vivo con el profesor.
-- **Fecha y entorno:** 2026-10-20, en vivo con el profesor
+- **Evidencia:** en local, [paso 1](img/EC-02-paso-1.png) y [paso 3](img/EC-02-paso-3.png).
+- **Estado:** Pasa, en vivo con el profesor y en local.
+- **Fecha y entorno:** 2026-10-20, en vivo con el profesor, y 2026-10-28, instalación local
+- **Notas:** En local, el listado dijo «Datos desde MongoDB en 0.9 ms»; la reserva, la confirmación y la
+  cancelación, «resuelto solo en MongoDB» (1,27, 0,63 y 1,3 ms). Los 6 intentos fallidos respondieron
+  «El correo o la contraseña no coinciden» y con la contraseña correcta entró.
 
 ### EC-03 · Sin Redis no hay sobrecupo, ni con 500 solicitudes simultáneas
 
@@ -137,9 +158,15 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 | 5 | Abrir el detalle de una actividad. | La misma página 503. | Igual. |
 | 6 | `docker compose start mongo`, esperar unos segundos y reservar en una actividad con cupo. | Todo funciona de nuevo, y `/estado` dice "Funcionamiento normal". | Igual. |
 
-- **Evidencia:** sin evidencia escrita; se hizo en vivo con el profesor.
-- **Estado:** Pasa, en vivo con el profesor.
-- **Fecha y entorno:** 2026-10-20, en vivo con el profesor
+- **Evidencia:** en local, [paso 2](img/EC-05-paso-2.png), [paso 3](img/EC-05-paso-3.png) y
+  [paso 4](img/EC-05-paso-4.png).
+- **Estado:** Pasa, en vivo con el profesor y en local.
+- **Fecha y entorno:** 2026-10-20, en vivo con el profesor, y 2026-10-28, instalación local
+- **Notas:** En local, 3 s después de detener MongoDB el listado salió «desde caché de Redis»; pasados
+  60 s, «desde copia de respaldo en Redis (MongoDB no responde)»; esa página tardó 2 s, porque antes
+  de usar la copia intenta MongoDB. El filtro por Limón y el detalle de una actividad dieron 503. La
+  sesión de voluntario1 siguió abierta (D12), y en el paso 6 la reserva funcionó unos segundos después
+  de iniciar `mongod` otra vez.
 
 ### EC-06 · La bitácora de eventos con Redis caído
 
@@ -154,7 +181,11 @@ prefijo de `REDIS_PREFIX`; aquí se usa el de `.env.example`, `grupoX:voluntacr:
 | 3 | `docker compose unpause redis`, esperar 30 s y abrir `/estado`. | La reserva del paso 2 no aparece: la bitácora es un registro de apoyo. La inscripción sí está en **Mis inscripciones**. | Igual. |
 | 4 | `docker compose exec redis redis-cli XLEN "grupoX:voluntacr:eventos"` y `docker compose exec redis redis-cli TTL "grupoX:voluntacr:eventos"` | `XLEN` da el mismo total que `/estado`; `TTL` da cerca de 2592000 (30 días). | Igual: `XLEN` da 332, el mismo total que `/estado`; `TTL` da 2592000. |
 
-- **Evidencia:** pasos 1 y 4 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-06; pasos 2 y 3 sin evidencia escrita.
-- **Estado:** Pasa. Los pasos 1 y 4 los corrió el script; los pasos 2 y 3 se hicieron en vivo con el profesor.
-- **Fecha y entorno:** pasos 1 y 4: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 y 3: 2026-10-20, en vivo con el profesor
-- **Notas:** El paso 4 se hizo con el cliente de Redis de la aplicación en lugar de `redis-cli`.
+- **Evidencia:** pasos 1 y 4 en el [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección EC-06;
+  en local, [paso 2](img/EC-06-paso-2.png).
+- **Estado:** Pasa. Los pasos 1 y 4 los corrió el script; los pasos 2 y 3 se hicieron en vivo con el
+  profesor y se repitieron en local.
+- **Fecha y entorno:** pasos 1 y 4: 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; pasos 2 y 3: 2026-10-20, en vivo con el profesor, y 2026-10-28, instalación local
+- **Notas:** El paso 4 se hizo con el cliente de Redis de la aplicación en lugar de `redis-cli`. En local,
+  al terminar la pausa `/estado` mostró los 2 eventos de antes y no la reserva hecha sin Redis, y
+  `redis-cli` dio `XLEN` 2 y `TTL` 2591868.
