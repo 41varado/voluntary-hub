@@ -5,18 +5,55 @@ seguimiento del curso.
 
 ## [Sin publicar]
 
+## [0.9.0] - 2026-11-03
+
+Release candidate del seguimiento 4.
+
+### Agregado
+- `portal.yml`, la ficha para el portal de proyectos del curso.
+- `scripts/mongosh/crear_esquema.js`: el mismo esquema de `crear_esquema.php` (colecciones,
+  validadores JSON Schema e índices) para mongosh. Lee la URI del `.env` y abre la conexión él mismo,
+  así la URI no se escribe en la línea de comandos (D26).
+- `scripts/probar_conexiones.php` avisa si faltan las extensiones `mbstring` o `fileinfo` de PHP: sin
+  ellas los scripts funcionan, pero las páginas fallan.
+- README: capturas, roadmap, instalación con GitHub Codespaces, notas para Windows, cómo comprobar la
+  instalación, todas las variables de entorno y las secciones de pruebas y de cómo contribuir.
+- Diagrama de arquitectura final (`docs/img/arquitectura.png`), con el módulo de avisos, Mailjet y
+  las cuatro estructuras de Redis.
+- Capturas de las pruebas con un motor detenido (EC-01, EC-02, EC-05 y EC-06) y del paso 3 de CN-03,
+  en `docs/pruebas/img/`.
+- `docs/redis-claves.md`: verificación final del mapa de claves y de las reglas del Redis compartido.
+- Decisión D26 y bitácora del seguimiento 4 (`docs/seguimientos/S4.md`), con la prueba de
+  instalación desde cero.
+
 ### Cambiado
 - Las confirmaciones (cancelar o eliminar una actividad, eliminar una imagen, desactivar una cuenta,
   enviar un aviso y cancelar una inscripción) se hacen en un diálogo con el diseño de la aplicación
   y ya no en la ventana del navegador.
 - Iniciar sesión, subir imágenes y restablecer una contraseña muestran sus errores en la página, como
   los demás formularios, en vez de los globos de validación del navegador.
+- README: los requisitos piden las extensiones `mbstring` y `fileinfo`, y la tabla de scripts incluye
+  las tres mediciones y el script de mongosh.
+- `docs/arquitectura/README.md`: el diagrama muestra todas las claves de Redis, sus etiquetas ya no
+  empiezan con «1.» (mermaid 11 las toma como una lista y muestra «Unsupported markdown: list») y la
+  sección de mediciones tiene los resultados.
+- `docs/despliegue-virtualmin.md`: revisión de las extensiones `mbstring` y `fileinfo`, y el esquema
+  con mongosh.
+- LICENSE: los nombres de los cuatro integrantes.
+- Bitácora S1: nombres de los integrantes, números de issue corregidos y enlaces a los commits del
+  avance de S2.
 
 ### Corregido
 - Al iniciar sesión, la administración y la coordinación podían terminar en «403 Sin permiso»: se
   las devolvía a la última página que se pidió sin sesión en ese navegador, aunque fuera de otro rol
   (por ejemplo, la bandeja de avisos de un voluntario). Ahora solo se vuelve a esa página si la
   cuenta tiene el rol que pide; si no, va al inicio de su rol.
+- `docs/despliegue-virtualmin.md`: el `git clone` apuntaba a `USUARIO/voluntacr`, un repositorio que
+  no existe.
+- La lista de asistencia y la página de avisos de una actividad repetían el punto después de la hora
+  («2:30 p. m.. Cada asistencia…»).
+- Con `RESERVA_MINUTOS=1`, la reserva decía «Confírmelo en los próximos 1 minutos»; ahora dice «en el
+  próximo minuto».
 
 ## [0.3.0] - 2026-10-27
 
@@ -100,3 +137,9 @@ seguimiento del curso.
   "Mi cuenta" con cambio de contraseña; cuentas que se desactivan en lugar de borrarse.
 - Avance del seguimiento 2: portal de actividades con filtros y caché, panel del coordinador con
   imágenes, reservas de cupo sin sobrecupo, cuentas de usuario, asistencia e historial de horas.
+
+[Sin publicar]: https://github.com/41varado/voluntary-hub/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/41varado/voluntary-hub/compare/v0.3.0...v0.9.0
+[0.3.0]: https://github.com/41varado/voluntary-hub/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/41varado/voluntary-hub/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/41varado/voluntary-hub/tree/v0.1.0

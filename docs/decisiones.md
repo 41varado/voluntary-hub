@@ -290,3 +290,23 @@ Registro de qué se decidió, qué alternativas había y por qué. Se agrega una
   3 días, lo que pasa del límite diario: en una actividad grande cancelada, el correo puede llegar
   tarde, aunque en el portal el aviso está desde el primer momento. Sin el cron, los correos
   fallidos no se reintentan.
+
+## D26. El esquema también se crea con mongosh, que lee la URI del `.env`
+
+- **Decisión:** `scripts/mongosh/crear_esquema.js` crea las mismas colecciones, validadores JSON
+  Schema e índices que `scripts/crear_esquema.php`. Se corre con `mongosh --nodb`: el script lee
+  `MONGO_URI` y `MONGO_DB` de la variable de entorno o del `.env`, con las mismas reglas que `Config`,
+  y abre la conexión él mismo. El esquema queda escrito dos veces, una en cada lenguaje, y cada
+  archivo avisa que hay que cambiar el otro.
+- **Alternativas:** `mongosh "$MONGO_URI" scripts/…js`; un archivo de configuración de mongosh con
+  la URI; que `crear_esquema.php` exporte el esquema a un JSON que lean los dos scripts.
+- **Por qué:** con la URI como argumento, la contraseña queda en el historial de la terminal y la ve
+  cualquier usuario del servidor con `ps`; un segundo archivo con la URI rompería la regla de que
+  solo vive en el `.env`. Leer el `.env` hace que el script use la misma base que la aplicación sin
+  configurar nada más. Escrito en JavaScript, el esquema se lee igual que en PHP, que es lo que se
+  explica en la exposición; un JSON generado sería más difícil de revisar y obligaría a tener PHP
+  para cambiarlo. Los datos de prueba se siguen cargando con `cargar_datos.php`, porque las
+  contraseñas usan `password_hash` de PHP.
+- **Costo:** hay dos copias del esquema que mantener iguales. El 28 de octubre se crearon las dos en
+  bases vacías y se compararon `listCollections` y `listIndexes`: quedaron iguales. Si alguien cambia
+  una sola, la otra queda atrás hasta que se corrija.

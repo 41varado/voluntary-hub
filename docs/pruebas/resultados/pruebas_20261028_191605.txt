@@ -1,0 +1,137 @@
+Pruebas automatizadas de VoluntaCR (docs/pruebas)
+Fecha: miércoles 28 de octubre de 2026, 7:16 p. m. (America/Costa_Rica). Duración: 10 min 5 s.
+Aplicación: http://localhost:8080, modo normal. MongoDB 7.0.14 (base «voluntacr»); Redis 7.2.16 (cliente PHP integrado, prefijo «grupoX:voluntacr:»).
+Avisos con el motor que resolvió cada reserva (APP_MODO_DEMO): sí.
+Acceso directo a la base de la aplicación: sí.
+Acceso directo al Redis de la aplicación: sí.
+Equipo: DEREKJRM, PHP 8.1.34. Opciones: ninguna.
+Actividades de prueba: «Prueba XX-NN 1028-1916», de coordinador1@voluntacr.test.
+
+[PASA] CN-01 · Flujo principal: de publicar a ver las horas
+  ✔ 1. Horas acumuladas: 2; Limpieza de playas y ríos: 0.
+  ✔ 2. código 303 → 200; «Actividad publicada. Ahora puede agregarle imágenes.»; se abrió la edición de la actividad.
+  ✔ 3. código 303 → 200; «1 imagen agregada.»; la imagen aparece en la actividad.
+  ✔ 4. Aparece con «2 cupos libres».
+  ✔ 5. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 26.23 ms)»; el bloque dice «Cupo apartado» con la cuenta regresiva; medidor: «1 cupo libre».
+  ✔ 6. «Cupo confirmado. Lo esperamos el día de la actividad. (resuelto solo en MongoDB, 26.29 ms)»; el bloque dice «Cupo confirmado».
+  ✔ 7. Aparece en Próximas con el estado «Confirmada».
+  ✔ 8. Cifras: confirmados 1, por confirmar 0, presentes 0, cupos libres 1; la casilla de voluntario1@voluntacr.test está habilitada.
+  ✔ 9. código 303 → 200; «Se avisó a 1 persona inscrita.»; «Asistencia guardada (1 cambio).»; presentes: 1.
+  ✔ 10. Horas acumuladas: 2 → 5; Limpieza de playas y ríos: 0 → 3; «Prueba CN-01 1028-1916» aparece en Actividades completadas.
+
+[PASA] CN-02 · Sin sobrecupo: actividad llena y cupo liberado
+  ✔ 1. código 303 → 200; «Actividad publicada. Ahora puede agregarle imágenes.»
+  ✔ 2. Botón «Reservar cupo» visible; medidor: «1 cupo libre».
+  ✔ 3. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 24.96 ms)»; medidor: «Sin cupos».
+  ✔ 4. «Ya no quedan cupos en esta actividad. (resuelto en Redis sin consultar MongoDB, 24.77 ms)»; el bloque dice «Sin cupos disponibles.»
+  ✔ 5. «Inscripción cancelada. Su cupo quedó libre para otra persona. (resuelto solo en MongoDB, 24.62 ms)»; medidor: «1 cupo libre».
+  ✔ 6. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 2.33 ms)»; después «Cupo confirmado. Lo esperamos el día de la actividad. (resuelto solo en MongoDB, 13.03 ms)»; medidor: «Sin cupos».
+  ✔ 7. Sin el filtro: aparece con «Sin cupos»; con «Solo con cupo libre»: no aparece.
+
+[PASA (pasos omitidos: 3)] CN-03 · Una reserva sin confirmar vence y devuelve el cupo
+  ✔ 1. código 303 → 200; «Actividad publicada. Ahora puede agregarle imágenes.»
+  ✔ 2. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 25.47 ms)»; cuenta regresiva hasta las 19:26:05 (10 min); medidor: «Sin cupos».
+  – 3. Omitido: la cuenta regresiva y el aviso «El tiempo terminó…» los muestra JavaScript en el navegador. La página sí trae ese aviso, oculto hasta que la cuenta llega a 0:00.
+  ✔ 4. Salida: «2026-10-28 19:26:09 reservas liberadas: 21»; la inscripción quedó «expirada» en MongoDB.
+  ✔ 5. Medidor: «1 cupo libre»; el bloque dice «Su inscripción anterior quedó vencida. Puede reservar de nuevo.»
+  ✔ 6. Aparece en Anteriores y canceladas con el estado «Venció sin confirmar».
+  Nota: La reserva duró 10 min, lo que indica RESERVA_MINUTOS en la aplicación (el documento usa 1). No se cambió el .env: el script esperó a que venciera mientras corrían las demás pruebas.
+
+[PASA (pasos omitidos: 2, 3, 4, 5, 6)] EC-01 · /estado en los tres modos: normal, respaldo (sin Redis) y crítico (sin MongoDB)
+  ✔ 1. «Funcionamiento normal»; MongoDB: «Conectado»; Redis: «Conectado».
+  – 2. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 3. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 4. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 5. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 6. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+
+[OMITIDA] EC-02 · Con Redis caído, el portal, las reservas y el inicio de sesión siguen funcionando
+  – 1. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 2. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 3. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 4. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 5. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+
+[PASA] EC-03 · Sin Redis no hay sobrecupo, ni con 500 solicitudes simultáneas
+  ✔ 1. repetición 1: 50 aceptadas, 50 en MongoDB, sobrecupo 0; repetición 2: 50 aceptadas, 50 en MongoDB, sobrecupo 0; repetición 3: 50 aceptadas, 50 en MongoDB, sobrecupo 0.
+  Nota: medir_cupos.php guardó docs/mediciones/cupos_20261028_191610.csv (solo el modo sin Redis).
+
+[PASA] EC-04 · Cuando Redis vuelve, un contador de cupos desfasado se corrige solo
+  ✔ 1. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 14.2 ms)»; medidor: «1 cupo libre».
+  ✔ 2. SET grupoX:voluntacr:cupos:6ae29e5a230faac79c0d3d0b 0 → OK.
+  ✔ 3. «Cupo reservado. Confírmelo en los próximos 10 minutos; si no, se libera para otra persona. (filtrado en Redis y confirmado en MongoDB, 27.49 ms)».
+  ✔ 4. GET grupoX:voluntacr:cupos:6ae29e5a230faac79c0d3d0b → '0'.
+
+[OMITIDA] EC-05 · Con MongoDB caído, el listado sale de la caché y lo demás muestra una página 503
+  – 1. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 2. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 3. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 4. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 5. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 6. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+
+[PASA (pasos omitidos: 2, 3)] EC-06 · La bitácora de eventos con Redis caído
+  ✔ 1. Últimos eventos: Cancelación de «Prueba EC-06 1028-1916»; Confirmación de «Prueba EC-06 1028-1916»; Reserva de «Prueba EC-06 1028-1916» (filtrada en Redis, 26.52 ms).
+  – 2. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  – 3. Omitido: requiere pausar o detener los motores, y el script no los controla en el servidor.
+  ✔ 4. XLEN = 12 (la página dice 12 eventos guardados); TTL = 2592000 s.
+
+[PASA] DI-01 · Una actividad incompleta o con valores fuera de rango no se guarda
+  ✔ 1. código 422; titulo: «Escriba un título de 5 a 120 caracteres.»; categoria: «Elija una categoría.»; fechaInicio: «Indique la fecha y la hora de inicio.»; provincia: «Elija una provincia.»; lugar: «Indique el lugar de encuentro (3 a 150 caracteres).»; descripcion: «Describa la actividad en 20 a 3000 caracteres.»
+  ✔ 2. código 422; titulo: «Escriba un título de 5 a 120 caracteres.»; categoria: «Elija una categoría.»; fechaInicio: «Indique la fecha y la hora de inicio.»; provincia: «Elija una provincia.»; lugar: «Indique el lugar de encuentro (3 a 150 caracteres).»; horas: «Las horas deben estar entre 0,5 y 24.»; cupoTotal: «El cupo debe ser un número entre 1 y 500.»; descripcion: «Describa la actividad en 20 a 3000 caracteres.»; lo escrito se conserva en el formulario.
+  ✔ 3. código 422; titulo: «Escriba un título de 5 a 120 caracteres.»; categoria: «Elija una categoría.»; fechaInicio: «Indique la fecha y la hora de inicio.»; provincia: «Elija una provincia.»; lugar: «Indique el lugar de encuentro (3 a 150 caracteres).»; horas: «Las horas deben estar entre 0,5 y 24.»; cupoTotal: «El cupo debe ser un número entre 1 y 500.»; descripcion: «Describa la actividad en 20 a 3000 caracteres.»
+  ✔ 4. Actividades en el panel: 12 antes y 12 después.
+
+[PASA] DI-02 · La fecha de inicio debe estar al menos una hora en el futuro
+  ✔ 1. Inicio 2026-10-28T19:46: código 422; fechaInicio: «La actividad debe empezar al menos dentro de una hora.»
+  ✔ 2. Inicio 2026-10-27T19:16: código 422; fechaInicio: «La actividad debe empezar al menos dentro de una hora.»
+  ✔ 3. Inicio 2026-10-28T21:16: código 303 → 200; «Actividad publicada. Ahora puede agregarle imágenes.»
+
+[PASA] DI-03 · Categoría, provincia y números se validan aunque se manipule el formulario
+  ✔ 1. código 422; categoria: «Elija una categoría.»; provincia: «Elija una provincia.»; no se creó la actividad.
+  ✔ 2. código 422; titulo: «Escriba un título de 5 a 120 caracteres.»; no se creó la actividad.
+  ✔ 3. código 422; cupoTotal: «El cupo debe ser un número entre 1 y 500.»; no se creó la actividad.
+  Nota: Los valores se enviaron directo por HTTP en lugar de cambiarlos con F12: el servidor recibe lo mismo.
+
+[PASA] DI-04 · El cupo no puede bajar de los lugares ya ocupados
+  ✔ 1. código 422; cupoTotal: «Ya hay 2 cupos ocupados; el cupo total no puede ser menor.»
+  ✔ 2. Cupos libres en el panel: «8 de 10».
+  Nota: Se usó una actividad creada por el script con 2 reservas (voluntario1 y voluntario3) en lugar de una de los datos de prueba.
+
+[PASA] DI-05 · Solo se aceptan imágenes reales, de hasta 2 MB y hasta 6 por actividad
+  ✔ 1. código 303 → 200; «foto.jpg» no es una imagen JPG, PNG o WebP.; imágenes en la actividad: 0.
+  ✔ 2. código 303 → 200; «prueba.png» no es una imagen JPG, PNG o WebP.; imágenes en la actividad: 0.
+  ✔ 3. PNG de 900 × 900 que pesa 2.32 MB: código 303 → 200; «grande.png» pesa más de 2 MB.; imágenes en la actividad: 0.
+  ✔ 4. código 303 → 200; «6 imágenes agregadas.»; «Cada actividad admite hasta 6 imágenes; solo se procesarán 6.»; imágenes en la actividad: 6.
+
+[PASA] DI-06 · El registro rechaza datos inválidos y correos repetidos
+  ✔ 1. código 422; nombre: «Escriba el nombre (3 a 80 caracteres).»; correo: «Escriba un correo válido, por ejemplo nombre@correo.com.»; clave: «La contraseña necesita al menos 8 caracteres.»
+  ✔ 2. código 422; clave2: «Las contraseñas no coinciden.»
+  ✔ 3. código 422; correo: «Ya existe una cuenta con ese correo. Inicie sesión.»
+
+[PASA] DI-07 · Inicio de sesión: datos incorrectos, cuenta desactivada y límite de intentos
+  ✔ 1. código 401; «El correo o la contraseña no coinciden.»
+  ✔ 2. código 401; «El correo o la contraseña no coinciden.»
+  ✔ 3. código 401; «Esta cuenta está desactivada. Si cree que es un error, comuníquese con la administración.»
+  ✔ 4. Intentos 2 a 5: «no coinciden»; con la contraseña correcta: código 401, «Demasiados intentos fallidos con este correo. Espere 15 minutos e inténtelo de nuevo.»
+  ✔ 5. código 303 → 200; «Hola, María José Vargas Calderón.»; entró.
+  Nota: Al terminar se borró en Redis el bloqueo de voluntario2, para que la cuenta se pueda usar enseguida.
+
+[PASA] DI-08 · Direcciones y formularios manipulados: identificadores inválidos, otra organización y CSRF
+  ✔ 1. código 404; «Esa actividad no existe o ya no está publicada.»
+  ✔ 2. código 404; «Esa actividad no existe.»
+  ✔ 3. código 403; «Solo la organización que publicó la actividad puede modificarla.» (actividad 6ae29e4883c12fe9eb06e762).
+  ✔ 4. código 419; «El formulario expiró. Recargue la página y vuelva a intentarlo.»; el título no cambió.
+
+[PASA] DI-09 · MongoDB rechaza con JSON Schema los datos inválidos aunque no pasen por la aplicación
+  ✔ 1. required: titulo, descripcion, categoria, provincia, lugar, fechaInicio, horas, cupoTotal, cuposDisponibles, estado, organizacion, imagenes, creadaEn.
+  ✔ 2. Error 121: «Document failed validation». cuposDisponibles sigue en 8.
+  ✔ 3. Error 121: «Document failed validation». cuposDisponibles sigue en 8.
+  ✔ 4. Error 121: «Document failed validation».
+  ✔ 5. Error 121: «Document failed validation».
+  ✔ 6. Error 121: «Document failed validation».
+  Nota: Las escrituras se hicieron sobre documentos de esta corrida (la actividad y una inscripción de DI-04) y sobre la cuenta de voluntario1, en lugar del primer documento que encuentre mongosh; si MongoDB hubiera aceptado alguna, se deshacía enseguida.
+
+Resumen: 16 pasan, 0 fallan y 2 se omitieron, de 18.
+  CN-01 Pasa · CN-02 Pasa · CN-03 Pasa · EC-01 Pasa · EC-02 Omitida · EC-03 Pasa · EC-04 Pasa · EC-05 Omitida · EC-06 Pasa · DI-01 Pasa · DI-02 Pasa · DI-03 Pasa · DI-04 Pasa · DI-05 Pasa · DI-06 Pasa · DI-07 Pasa · DI-08 Pasa · DI-09 Pasa
+Limpieza: actividades de prueba eliminadas: 1; canceladas porque tienen inscripciones: 6.

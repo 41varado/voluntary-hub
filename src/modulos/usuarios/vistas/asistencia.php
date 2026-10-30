@@ -7,7 +7,7 @@ $presentes = count(array_filter($confirmados, fn($i) => !empty($i['asistencia'][
     <div>
         <p class="detalle__migas"><a href="<?= e(url('/panel')) ?>">Panel de mi organización</a></p>
         <h1><?= e($actividad['titulo']) ?></h1>
-        <p class="texto-suave"><?= e(fecha_cr($actividad['fechaInicio'])) ?>. Cada asistencia suma <?= e(plural((float) $actividad['horas'], 'hora', 'horas')) ?> al voluntario.</p>
+        <p class="texto-suave"><?= e(fecha_cr($actividad['fechaInicio'])) ?> Cada asistencia suma <?= e(plural((float) $actividad['horas'], 'hora', 'horas')) ?> al voluntario.</p>
     </div>
 </div>
 
