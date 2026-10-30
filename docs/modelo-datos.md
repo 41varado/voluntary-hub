@@ -1,7 +1,9 @@
-# Modelo de datos v1 (MongoDB)
+# Modelo de datos (MongoDB)
 
 Base de datos: `voluntacr` (configurable con `MONGO_DB`).
 Se crea con `php scripts/crear_esquema.php`, que aplica la validación **JSON Schema** y los índices.
+Sin PHP, `mongosh --nodb --quiet scripts/mongosh/crear_esquema.js` crea el mismo esquema y lee la URI
+del `.env` (D26). La versión 1, del seguimiento 1, está en el tag `v0.1.0`.
 
 ## Dónde corre MongoDB
 
@@ -203,4 +205,7 @@ Además de la validación en PHP, MongoDB rechaza documentos inválidos. Lo más
 - Patrón del correo, del nombre de archivo de las imágenes y del hash del token de confirmación
   (64 caracteres hexadecimales).
 
-El esquema completo está en [`scripts/crear_esquema.php`](../scripts/crear_esquema.php).
+El esquema completo está en [`scripts/crear_esquema.php`](../scripts/crear_esquema.php), y el mismo,
+para mongosh, en [`scripts/mongosh/crear_esquema.js`](../scripts/mongosh/crear_esquema.js). El 28 de
+octubre se crearon los dos en bases vacías y se compararon `listCollections` y `listIndexes`: los
+validadores y los 14 índices quedaron iguales.

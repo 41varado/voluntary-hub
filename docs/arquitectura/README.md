@@ -1,4 +1,7 @@
-# Arquitectura v1
+# Arquitectura
+
+Versión final (seguimiento 4). La v1 del seguimiento 1 está en
+[arquitectura-v1.png](../img/arquitectura-v1.png).
 
 VoluntaCR es una aplicación web en PHP (sin framework ni Composer) con dos motores de datos:
 **MongoDB** (el instalado en el servidor del curso) como fuente de verdad y **Redis** como
@@ -11,6 +14,9 @@ Los correos (la confirmación de la cuenta y los avisos a los inscritos) salen p
 servicio externo, no un motor de datos: lo que se envía queda primero en MongoDB.
 
 ## Diagrama
+
+La imagen [arquitectura.png](../img/arquitectura.png), que usa el README, se genera a partir de este
+diagrama.
 
 ```mermaid
 flowchart LR
@@ -34,10 +40,18 @@ flowchart LR
     end
 
     subgraph R["Redis · acelerador"]
-        R1["cupos:{actividad}<br/>contador (Lua)"]
-        R2["candado:reserva:* · candado:aviso:*<br/>SET NX, 5 y 10 s"]
-        R3["cache:actividades:*<br/>JSON, 60 s"]
-        R4["intentos:login:*<br/>contador, 15 min"]
+        R1["cupos:{actividad}<br/>contador (Lua), 1 h"]
+        R2["candado:reserva:{actividad}:{usuario}<br/>candado:aviso:{actividad} · liberando:{actividad}<br/>SET NX, 5 a 15 s"]
+        R3["cache:actividades:v{versión}:{filtros}<br/>respaldo:actividades:{filtros}<br/>JSON, 60 s y 24 h"]
+        R4["intentos:login:{correo}<br/>contador, 15 min"]
+        R5["actividad:{id}:visitas<br/>hash por día, 90 días"]
+        R6["ranking:horas<br/>sorted set, 1 h"]
+        R7["eventos<br/>stream, unos 10 000"]
+        %% Enlaces invisibles: arriba los strings; abajo el hash, el sorted set y el stream.
+        R1 ~~~ R5
+        R2 ~~~ R6
+        R3 ~~~ R7
+        R4 ~~~ R7
     end
 
     subgraph MDB["MongoDB · fuente de verdad"]
@@ -56,10 +70,10 @@ flowchart LR
     V --> APP
     C --> APP
     AD --> APP
-    N -->|1. filtro rápido| R
-    N -->|2. operación atómica| MDB
+    N -->|paso 1: filtro rápido| R
+    N -->|paso 2: operación atómica| MDB
     M1 -->|guarda archivos| F
-    N -->|3. correos, después de guardar en MongoDB| MJ
+    N -->|paso 3: correos, después de guardar en MongoDB| MJ
     CRON --> MDB
     CRON2 -->|reintenta los fallidos| MJ
     N -.->|si Redis no responde,<br/>todo va directo a MongoDB| MDB
@@ -179,9 +193,17 @@ borra, para que no quede un cupo descontado sin reserva; se vuelve a cargar cuan
   actualiza en todas sus inscripciones (gancho `actividad.actualizada`).
 - **Red de seguridad:** `scripts/reconciliar_cupos.php` recalcula los cupos desde las inscripciones.
 
-## Qué se va a medir
+## Qué se midió
 
-Ver la sección de mediciones del [README](../../README.md#mediciones). La principal:
-500 inscripciones simultáneas sobre una actividad de 50 cupos, con Redis y sin Redis
-(`scripts/medir_cupos.php`), comparando tiempo total, latencia y sobrecupo
-([detalle](../mediciones/cupos.md)).
+Tres mediciones en GitHub Codespaces, el 26 de octubre de 2026, con la mediana de 3 repeticiones.
+El detalle, los CSV y la interpretación están en [docs/mediciones](../mediciones/README.md).
+
+| Medición | Con Redis o con índice | Sin Redis o sin índice |
+|---|---|---|
+| [Reservas simultáneas](../mediciones/cupos.md): 500 solicitudes sobre 50 cupos | 438,6 ms en total; sobrecupo 0 | 758,7 ms en total; sobrecupo 0 |
+| [Listado de actividades](../mediciones/listado.md): latencia mediana | 0,160 ms | 0,958 ms |
+| [Consulta del portal](../mediciones/indice.md) con categoría y provincia | 9 documentos examinados; 0,381 ms | 20 042 documentos examinados; 12,526 ms |
+
+Las tres confirman el reparto de roles: el sobrecupo lo impide MongoDB, con o sin Redis (D2); Redis le
+quita carga, porque las reservas rechazadas y casi todo el listado ya no le llegan; y el índice
+compuesto del portal hace que MongoDB lea solo los documentos que muestra.

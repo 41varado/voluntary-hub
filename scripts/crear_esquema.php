@@ -6,6 +6,9 @@
  *
  *   php scripts/crear_esquema.php
  *
+ * El mismo esquema para mongosh está en scripts/mongosh/crear_esquema.js: si cambia
+ * uno, cambie también el otro (D26).
+ *
  * Responsable: Persona 2 (MongoDB).
  */
 declare(strict_types=1);
