@@ -13,13 +13,13 @@ $describe = fn(string $campo) => isset($errores[$campo]) ? ' aria-describedby="e
     <div>
         <p class="detalle__migas"><a href="<?= e(url('/panel')) ?>">Panel de mi organización</a></p>
         <h1><?= e($actividad['titulo']) ?></h1>
-        <p class="texto-suave"><?= e(fecha_cr($actividad['fechaInicio'])) ?>. <?= e(plural($inscritos, 'persona inscrita', 'personas inscritas')) ?>, contando las reservas por confirmar.</p>
+        <p class="texto-suave"><?= e(fecha_cr($actividad['fechaInicio'])) ?> <?= e(plural($inscritos, 'persona inscrita', 'personas inscritas')) ?>, contando las reservas por confirmar.</p>
     </div>
 </div>
 
 <div class="medio">
     <form class="tarjeta formulario" method="post" action="<?= e(url('/panel/actividades/' . $id . '/avisos')) ?>" novalidate
-          data-confirmar="¿Enviar este aviso a <?= e(plural($inscritos, 'persona', 'personas')) ?>?">
+          data-confirmar="¿Enviar este aviso a <?= e(plural($inscritos, 'persona', 'personas')) ?>?" data-confirmar-estilo="principal">
         <?= csrf_campo() ?>
         <h2>Enviar un aviso a las personas inscritas</h2>
         <p class="texto-suave">Les llega a todas en «Avisos», dentro del portal, y por correo a quienes no desactivaron
