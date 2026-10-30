@@ -42,3 +42,56 @@ listado, intentos de inicio de sesión), *hash* (visitas), *sorted set* (ranking
 
 Cada operación pasa por `RedisSeguro::usar()`, que devuelve un valor de respaldo cuando Redis no
 está. Ver la sección "¿Qué ocurre si Redis se cae?" en [arquitectura](arquitectura/README.md).
+
+## Verificación final
+
+Revisión del seguimiento 4, el 28 de octubre de 2026.
+
+**Comandos prohibidos en el Redis compartido.** Búsqueda en todo el código:
+
+```bash
+git grep -niE "flushall|flushdb" -- src scripts public
+git grep -niE "(->keys\(|'KEYS'|\"KEYS\"|redis\.call\('keys')" -- src scripts public
+```
+
+- `FLUSHALL` y `FLUSHDB` aparecen solo en dos comentarios que dicen que no se usan
+  (`src/Nucleo/RedisSeguro.php` y `scripts/cargar_datos.php`).
+- `KEYS` no aparece. Las claves del grupo se recorren con `SCAN` y el prefijo en dos lugares:
+  `cargar_datos.php --limpiar`, que borra solo las claves del grupo, y `/estado`, que las cuenta.
+- Fuera de `EVAL`, la aplicación solo manda comandos de string (`GET`, `SET` con `NX` y `EX`,
+  `SETEX`, `INCR`, `EXPIRE`, `DEL`), `SCAN`, `PING`, `INFO`, `AUTH` y `SELECT`. Dentro de los scripts
+  Lua: `DECR`, `GET`, `DEL`, `EXISTS`, `EXPIRE`, `HINCRBY`, `HGETALL`, `ZADD`, `ZINCRBY`, `ZREM`,
+  `ZSCORE`, `ZCARD`, `ZCOUNT`, `ZREVRANGE`, `XADD`, `XLEN` y `XREVRANGE`. Las pruebas automatizadas
+  agregan `TTL`, para revisar el vencimiento del stream (EC-06).
+
+**Ver las claves del grupo sin `KEYS *`**, por ejemplo en el servidor del curso:
+
+```bash
+redis-cli --scan --pattern 'grupo3:voluntacr:*'          # todas las del grupo
+redis-cli --scan --pattern 'grupo3:voluntacr:cupos:*'    # una sola familia
+```
+
+`/estado` muestra cuántas son. En el servidor, el 28 de octubre, eran 18.
+
+**Claves reales.** En la instalación local desde cero del 28 de octubre (Redis 7.2.16, prefijo
+`grupoX:voluntacr:`) se leyeron con `redis-cli --scan`, `TYPE` y `TTL` en tres momentos: después de
+una reserva, después de un aviso de la organización y al final de una sesión con un inicio de sesión
+fallido y una visita a `/estado`.
+
+| Clave (sin prefijo) | Tipo | TTL leído | TTL del mapa |
+|---|---|---|---|
+| `cupos:{actividadId}` | string | 3591 a 3599 s | 1 h |
+| `candado:aviso:{actividadId}` | string | 5 a 10 s | 10 s |
+| `cache:actividades:version` | string | sin TTL (−1) | sin TTL |
+| `cache:actividades:v{version}:{md5}` | string | 50 a 58 s | 60 s |
+| `respaldo:actividades:{md5}` | string | 86 390 a 86 398 s | 24 h |
+| `actividad:{actividadId}:visitas` | hash | 7 775 989 a 7 775 999 s | 90 días |
+| `intentos:login:{md5}` | string | 900 s | 15 min |
+| `ranking:horas` | zset | 3596 s | 1 h |
+| `eventos` | stream | 2 591 993 a 2 592 000 s | 30 días |
+| `hola` | string | 30 s | 30 s |
+
+Todas coinciden con el mapa. Las dos que no aparecen también existen, pero duran muy poco:
+`candado:reserva:{actividadId}:{usuarioId}` se borra apenas termina la reserva, y
+`liberando:{actividadId}` solo se crea cuando una actividad llena recibe otra reserva; es la que
+corrige el contador en EC-04, que pasó en esa misma instalación.
