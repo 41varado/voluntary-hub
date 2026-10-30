@@ -1,8 +1,11 @@
 <?php
 /**
- * "Hola mundo" por consola: comprueba la conexión a MongoDB y a Redis.
+ * "Hola mundo" por consola: comprueba la conexión a MongoDB y a Redis, y la configuración de Mailjet.
  *
  *   php scripts/probar_conexiones.php
+ *
+ * El resultado de Mailjet no cambia el código de salida: scripts/codespaces.sh espera a que este
+ * script termine bien, y el correo es opcional.
  *
  * Responsable: Persona 3.
  */
@@ -12,9 +15,17 @@ require __DIR__ . '/../src/bootstrap.php';
 
 echo "PHP " . PHP_VERSION . "\n";
 echo "  extensión mongodb: " . (extension_loaded('mongodb') ? phpversion('mongodb') : 'NO INSTALADA') . "\n";
-echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'no instalada; se usa el cliente PHP integrado') . "\n\n";
+echo "  extensión redis:   " . (extension_loaded('redis') ? phpversion('redis') : 'no instalada; se usa el cliente PHP integrado') . "\n";
+// Los scripts no las usan, pero sin ellas las páginas fallan: mbstring para los textos y fileinfo para
+// revisar las imágenes que se suben.
+$faltan = array_values(array_filter(['mbstring', 'fileinfo'], fn(string $extension) => !extension_loaded($extension)));
+echo match (count($faltan)) {
+    0       => "  extensiones mbstring y fileinfo: activas\n\n",
+    1       => "✘ Falta la extensión {$faltan[0]} de PHP: actívela en php.ini (README, sección Requisitos).\n\n",
+    default => "✘ Faltan las extensiones mbstring y fileinfo de PHP: actívelas en php.ini (README, sección Requisitos).\n\n",
+};
 
-$todoBien = true;
+$todoBien = $faltan === [];
 
 try {
     $mongo = Mongo::get()->ping();
@@ -41,6 +52,18 @@ if ($estado['ok']) {
     $todoBien = false;
     echo "✘ Redis: {$estado['motivo']}\n";
     echo "  La aplicación seguirá funcionando en modo respaldo, solo con MongoDB.\n";
+}
+
+// Mailjet en modo de prueba (SandboxMode): revisa las claves y el remitente sin entregar ningún correo.
+if (!Correo::configurado()) {
+    echo "- Mailjet: sin configurar. Los correos se anotan en storage/correos.log.\n";
+} elseif (!ini_get('allow_url_fopen') || !extension_loaded('openssl')) {
+    echo "✘ Mailjet: hace falta allow_url_fopen = On y la extensión openssl para llamar a la API.\n";
+} else {
+    $mailjet = Correo::probar();
+    echo $mailjet['ok']
+        ? "✔ Mailjet respondió en {$mailjet['ms']} ms (remitente: {$mailjet['remitente']}, modo de prueba: no se envió nada)\n"
+        : "✘ Mailjet: {$mailjet['motivo']}\n  Los avisos se guardan igual; los correos se reintentan con scripts/enviar_correos.php.\n";
 }
 
 exit($todoBien ? 0 : 1);

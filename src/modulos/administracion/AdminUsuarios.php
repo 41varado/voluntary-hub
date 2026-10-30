@@ -15,6 +15,7 @@ use MongoDB\Driver\Exception\BulkWriteException;
  *     administrador que los crea; la pantalla de usuarios no puede convertir a nadie en admin.
  *   - Nadie puede desactivarse a sí mismo y siempre queda al menos un administrador activo.
  *   - Desactivar una cuenta o restablecer su contraseña cierra sus sesiones abiertas.
+ *   - Las cuentas nuevas, y las que cambian de correo, no pueden iniciar sesión hasta confirmarlo (D23).
  */
 final class AdminUsuarios
 {
@@ -116,6 +117,11 @@ final class AdminUsuarios
         }
         if ($errores) {
             return $errores;
+        }
+        // Un correo nuevo hay que confirmarlo; la sesión abierta se cierra en la siguiente revisión (D12).
+        if ($datos['correo'] !== $doc['correo']) {
+            $datos['correoVerificado'] = false;
+            $datos['verificacion'] = null;
         }
         try {
             Mongo::get()->actualizar('usuarios', ['_id' => $doc['_id'], 'rol' => ['$ne' => 'admin']], ['$set' => $datos + [

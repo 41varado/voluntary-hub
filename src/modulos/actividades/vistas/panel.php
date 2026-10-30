@@ -1,5 +1,5 @@
 <?php
-/** Variables: $usuario, $actividades (con 'conteos' por estado de inscripción) */
+/** Variables: $usuario, $actividades (con 'conteos' por estado de inscripción), $visitas (null si Redis no responde) */
 $nombresEstado = ['publicada' => 'Publicada', 'borrador' => 'Borrador', 'cancelada' => 'Cancelada'];
 ?>
 <div class="encabezado-seccion">
@@ -27,6 +27,7 @@ $nombresEstado = ['publicada' => 'Publicada', 'borrador' => 'Borrador', 'cancela
                 <th scope="col" class="numero">Confirmadas</th>
                 <th scope="col" class="numero">Por confirmar</th>
                 <th scope="col" class="numero">Cupos libres</th>
+                <th scope="col" class="numero">Visitas</th>
                 <th scope="col">Acciones</th>
             </tr>
             </thead>
@@ -39,6 +40,14 @@ $nombresEstado = ['publicada' => 'Publicada', 'borrador' => 'Borrador', 'cancela
                     <td class="numero"><?= (int) ($a['conteos']['confirmada'] ?? 0) ?></td>
                     <td class="numero"><?= (int) ($a['conteos']['reservada'] ?? 0) ?></td>
                     <td class="numero"><?= (int) $a['cuposDisponibles'] ?> de <?= (int) $a['cupoTotal'] ?></td>
+                    <td class="numero">
+                        <?php if ($visitas === null): ?>
+                            —
+                        <?php else: ?>
+                            <?= (int) ($visitas[$id]['total'] ?? 0) ?>
+                            <?php if (!empty($visitas[$id]['hoy'])): ?><span class="texto-suave">(<?= (int) $visitas[$id]['hoy'] ?> hoy)</span><?php endif; ?>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         <div class="acciones">
                             <a href="<?= e(url('/panel/actividades/' . $id . '/editar')) ?>">Editar</a>
@@ -61,4 +70,8 @@ $nombresEstado = ['publicada' => 'Publicada', 'borrador' => 'Borrador', 'cancela
             </tbody>
         </table>
     </div>
+    <p class="texto-suave" style="margin-top:.8rem">
+        Visitas: cuántas veces se abrió el detalle de cada actividad. Cada navegador cuenta una vez por día
+        y las visitas de su organización no cuentan.<?= $visitas === null ? ' Ahora no se pueden mostrar porque Redis no responde.' : '' ?>
+    </p>
 <?php endif; ?>

@@ -1,12 +1,14 @@
 <?php
 /**
- * Módulo de usuarios: registro, inicio de sesión, "Mi cuenta", horas del voluntario y
- * registro de asistencia por parte del coordinador.
+ * Módulo de usuarios: registro, confirmación del correo, inicio de sesión, "Mi cuenta", horas del
+ * voluntario y registro de asistencia por parte del coordinador.
  * Responsable: Persona 4.
  */
 declare(strict_types=1);
 
 require_once __DIR__ . '/UsuarioRepositorio.php';
+require_once __DIR__ . '/VerificacionCorreo.php';
+require_once __DIR__ . '/RankingHoras.php';
 
 return function (Router $router): void {
 
@@ -36,8 +38,9 @@ return function (Router $router): void {
 
     /*
      * En cada solicitud, como máximo cada SESION_VERIFICAR_SEG segundos, se revisa en MongoDB
-     * que la cuenta siga activa y que la contraseña no se haya restablecido. Así, si la
-     * administración desactiva una cuenta o le cambia el rol, el cambio se aplica enseguida.
+     * que la cuenta siga activa, con el correo confirmado, y que la contraseña no se haya
+     * restablecido. Así, si la administración desactiva una cuenta, le cambia el rol o el correo,
+     * el cambio se aplica enseguida.
      */
     Ganchos::agregar('solicitud.inicio', function (): void {
         $usuario = Sesion::usuario();
@@ -51,7 +54,7 @@ return function (Router $router): void {
         }
         if ($actualizado === null) {
             Sesion::cerrar();
-            flash('aviso', 'Su sesión se cerró porque la cuenta fue desactivada o su contraseña cambió. Vuelva a iniciar sesión.');
+            flash('aviso', 'Su sesión se cerró porque la cuenta fue desactivada, su contraseña cambió o su correo tiene que confirmarse de nuevo. Vuelva a iniciar sesión.');
             return;
         }
         Sesion::actualizar($actualizado);
@@ -70,38 +73,67 @@ return function (Router $router): void {
 
     $inicioPorRol = ['voluntario' => '/actividades', 'coordinador' => '/panel', 'admin' => '/admin/usuarios'];
 
+    /*
+     * Cuenta que todavía no confirmó su correo. Se recuerda en la sesión de este navegador, donde se
+     * creó o donde se escribió bien su contraseña, para mostrarle "Confirme su correo" y dejarle pedir
+     * otro enlace sin escribir ningún correo en un formulario.
+     */
+    $recordarPendiente = function (string $id, ?array $envio = null): void {
+        if (($_SESSION['verificacion_pendiente'] ?? null) !== $id) {
+            unset($_SESSION['verificacion_enlace']);
+        }
+        $_SESSION['verificacion_pendiente'] = $id;
+        // Si el correo no se puede enviar (sin Mailjet o a una dirección .test), el enlace se muestra
+        // en la página, solo en este navegador.
+        if ($envio !== null && $envio['estado'] === 'omitido') {
+            $_SESSION['verificacion_enlace'] = ['ruta' => $envio['ruta'], 'motivo' => $envio['motivo']];
+        }
+    };
+
     /* ---------- Registro e inicio de sesión ---------- */
 
     $router->get('/registro', function (): void {
         vista('usuarios/registro', ['valores' => [], 'errores' => []], 'Crear cuenta');
     });
 
-    $router->post('/registro', function (): void {
-        [$usuario, $errores] = UsuarioRepositorio::registrar($_POST);
+    $router->post('/registro', function () use ($recordarPendiente): void {
+        [$doc, $errores] = UsuarioRepositorio::registrar($_POST);
         if ($errores) {
             vista('usuarios/registro', ['valores' => $_POST, 'errores' => $errores], 'Crear cuenta', 422);
             return;
         }
-        Sesion::iniciarComo($usuario);
-        flash('exito', 'Bienvenido, ' . $usuario['nombre'] . '. Ya puede reservar cupos.');
-        redirigir('/actividades');
+        $envio = VerificacionCorreo::enviar($doc);
+        $recordarPendiente((string) $doc['_id'], $envio);
+        if ($envio['estado'] === 'fallido') {
+            flash('error', VerificacionCorreo::textoResultado($envio, $doc['correo']));
+        }
+        redirigir('/verificar-correo');
     });
 
     $router->get('/ingresar', function () use ($destinoSeguro): void {
         if (consulta('volver') !== '') {
-            $_SESSION['volver_a'] = $destinoSeguro(consulta('volver'));
+            $_SESSION['volver_a'] = ['ruta' => $destinoSeguro(consulta('volver')), 'rol' => null];
         }
         vista('usuarios/ingresar', ['correo' => '', 'error' => ''], 'Iniciar sesión');
     });
 
-    $router->post('/ingresar', function () use ($destinoSeguro, $inicioPorRol): void {
-        [$usuario, $error] = UsuarioRepositorio::autenticar(entrada('correo'), (string) ($_POST['clave'] ?? ''));
+    $router->post('/ingresar', function () use ($destinoSeguro, $inicioPorRol, $recordarPendiente): void {
+        [$usuario, $error, $sinConfirmar] = UsuarioRepositorio::autenticar(entrada('correo'), (string) ($_POST['clave'] ?? ''));
+        if ($sinConfirmar !== null) {
+            $recordarPendiente($sinConfirmar);
+            flash('aviso', 'Confirme su correo antes de iniciar sesión: abra el enlace que le enviamos o pida uno nuevo.');
+            redirigir('/verificar-correo');
+        }
         if ($usuario === null) {
             vista('usuarios/ingresar', ['correo' => entrada('correo'), 'error' => $error], 'Iniciar sesión', 401);
             return;
         }
-        $volver = $destinoSeguro($_SESSION['volver_a'] ?? null);
+        // Vuelve a la página que se pidió sin sesión si esta cuenta puede abrirla. Si no (por ejemplo,
+        // alguien abrió /avisos en este navegador y entra la administración), va al inicio de su rol.
+        $pedida = $_SESSION['volver_a'] ?? null;
         unset($_SESSION['volver_a']);
+        $rolPedido = $pedida['rol'] ?? null;
+        $volver = ($rolPedido === null || $rolPedido === $usuario['rol']) ? $destinoSeguro($pedida['ruta'] ?? null) : '/';
         Sesion::iniciarComo($usuario);
         flash('exito', 'Hola, ' . $usuario['nombre'] . '.');
         redirigir($volver !== '/' ? $volver : ($inicioPorRol[$usuario['rol']] ?? '/'));
@@ -113,6 +145,62 @@ return function (Router $router): void {
         redirigir('/actividades');
     });
 
+    /* ---------- Confirmación del correo ---------- */
+
+    $router->get('/verificar-correo', function (): void {
+        $doc = UsuarioRepositorio::buscar((string) ($_SESSION['verificacion_pendiente'] ?? ''));
+        if ($doc === null || !VerificacionCorreo::pendiente($doc)) {
+            unset($_SESSION['verificacion_pendiente'], $_SESSION['verificacion_enlace']);
+            if ($doc !== null) {
+                flash('exito', 'Su correo ya está confirmado. Inicie sesión.');
+            }
+            redirigir('/ingresar');
+        }
+        vista('usuarios/verificar', ['doc' => $doc, 'enlace' => $_SESSION['verificacion_enlace'] ?? null], 'Confirme su correo');
+    });
+
+    $router->post('/verificar-correo/reenviar', function () use ($recordarPendiente): void {
+        $doc = UsuarioRepositorio::buscar((string) ($_SESSION['verificacion_pendiente'] ?? ''));
+        if ($doc === null) {
+            redirigir('/ingresar');
+        }
+        $envio = VerificacionCorreo::enviar($doc);
+        $recordarPendiente((string) $doc['_id'], $envio);
+        $tipo = ['enviado' => 'exito', 'fallido' => 'error'][$envio['estado']] ?? 'aviso';
+        flash($tipo, VerificacionCorreo::textoResultado($envio, $doc['correo']));
+        redirigir('/verificar-correo');
+    });
+
+    $router->get('/verificar-correo/{id}/{token}', function (string $id, string $token) use ($inicioPorRol): void {
+        $resultado = VerificacionCorreo::confirmar($id, $token);
+        // Solo se entra directo si el enlace se abre en el navegador donde se creó la cuenta o se
+        // escribió su contraseña: así nadie queda dentro de una cuenta que otra persona creó con su correo.
+        $mismoNavegador = ($_SESSION['verificacion_pendiente'] ?? null) === $id;
+
+        if ($resultado['estado'] === 'vencido' || $resultado['estado'] === 'invalido') {
+            $problema = $resultado['estado'] === 'vencido' ? 'El enlace venció.' : 'El enlace no es válido o ya se usó.';
+            if ($mismoNavegador) {
+                flash('error', $problema . ' Use el del correo más reciente o pida uno nuevo.');
+                redirigir('/verificar-correo');
+            }
+            flash('error', $problema . ' Si todavía no confirmó su correo, inicie sesión para pedir uno nuevo.');
+            redirigir('/ingresar');
+        }
+
+        if ($mismoNavegador) {
+            unset($_SESSION['verificacion_pendiente'], $_SESSION['verificacion_enlace']);
+        }
+        $doc = $resultado['usuario'];
+        if ($resultado['estado'] === 'confirmado' && $mismoNavegador && UsuarioRepositorio::estaActivo($doc)) {
+            $usuario = UsuarioRepositorio::aSesion($doc);
+            Sesion::iniciarComo($usuario);
+            flash('exito', 'Correo confirmado. Bienvenido, ' . $usuario['nombre'] . '.');
+            redirigir($inicioPorRol[$usuario['rol']] ?? '/');
+        }
+        flash('exito', $resultado['estado'] === 'confirmado' ? 'Correo confirmado. Ya puede iniciar sesión.' : 'Su correo ya estaba confirmado. Inicie sesión.');
+        redirigir('/ingresar');
+    });
+
     /* ---------- Mi cuenta (todos los roles) ---------- */
 
     $mostrarCuenta = function (array $erroresPerfil = [], array $erroresClave = [], ?array $valores = null, int $codigo = 200): void {
@@ -120,7 +208,11 @@ return function (Router $router): void {
         $doc = UsuarioRepositorio::buscar($usuario['id']);
         vista('usuarios/cuenta', [
             'doc'          => $doc,
-            'valores'      => $valores ?? ['nombre' => $doc['nombre'], 'provincia' => $doc['provincia'] ?? ''],
+            'valores'      => $valores ?? [
+                'nombre'          => $doc['nombre'],
+                'provincia'       => $doc['provincia'] ?? '',
+                'avisosPorCorreo' => ($doc['avisosPorCorreo'] ?? true) !== false,
+            ],
             'erroresPerfil' => $erroresPerfil,
             'erroresClave' => $erroresClave,
         ], 'Mi cuenta', $codigo);
@@ -132,7 +224,7 @@ return function (Router $router): void {
 
     $router->post('/mi-cuenta', function () use ($mostrarCuenta): void {
         $usuario = Sesion::requiere();
-        [$sesion, $errores] = UsuarioRepositorio::actualizarPerfil(Mongo::id($usuario['id']), $_POST);
+        [$sesion, $errores] = UsuarioRepositorio::actualizarPerfil(Mongo::id($usuario['id']), $_POST, $usuario['rol'] === 'voluntario');
         if ($errores) {
             $mostrarCuenta($errores, [], $_POST, 422);
             return;
@@ -167,6 +259,7 @@ return function (Router $router): void {
             'totalHoras'   => array_sum(array_column($porCategoria, 'horas')),
             'totalActiv'   => count($asistidas),
             'asistidas'    => $asistidas,
+            'ranking'      => RankingHoras::consultar($usuario['id']),
         ], 'Mis horas');
     });
 
@@ -209,21 +302,32 @@ return function (Router $router): void {
         }
         $presentes = array_flip(array_filter((array) ($_POST['presentes'] ?? []), 'is_string'));
         $bd = Mongo::get();
-        $confirmados = $bd->buscar('inscripciones', ['actividadId' => $actividad['_id'], 'estado' => 'confirmada'], ['projection' => ['asistencia' => 1]]);
+        $confirmados = $bd->buscar('inscripciones', ['actividadId' => $actividad['_id'], 'estado' => 'confirmada'], ['projection' => ['asistencia' => 1, 'voluntarioId' => 1]]);
         $cambios = 0;
+        $horasPorVoluntario = [];
         foreach ($confirmados as $inscripcion) {
             $marcado = isset($presentes[(string) $inscripcion['_id']]);
             $estaba = !empty($inscripcion['asistencia']['presente']);
             if ($marcado === $estaba) {
                 continue;
             }
-            $cambios += $bd->actualizar('inscripciones', ['_id' => $inscripcion['_id'], 'estado' => 'confirmada'], ['$set' => ['asistencia' => [
+            $guardado = $bd->actualizar('inscripciones', ['_id' => $inscripcion['_id'], 'estado' => 'confirmada'], ['$set' => ['asistencia' => [
                 'presente'      => $marcado,
                 'horas'         => $marcado ? $actividad['horas'] : 0,
                 'registradaEn'  => Mongo::ahora(),
                 'registradaPor' => Mongo::id($usuario['id']),
             ]]]);
+            if ($guardado > 0) {
+                // Al desmarcar se restan las horas que se habían guardado, no las actuales de la actividad.
+                $voluntario = (string) $inscripcion['voluntarioId'];
+                $horasPorVoluntario[$voluntario] = ($horasPorVoluntario[$voluntario] ?? 0)
+                    + ($marcado ? (float) $actividad['horas'] : -(float) ($inscripcion['asistencia']['horas'] ?? 0));
+            }
+            $cambios += $guardado;
         }
+        RankingHoras::sumar($horasPorVoluntario);
+        // Por ejemplo, el módulo de notificaciones avisa a cada persona las horas que se le sumaron o restaron.
+        Ganchos::ejecutar('asistencia.guardada', $actividad, $horasPorVoluntario);
         flash('exito', $cambios > 0 ? 'Asistencia guardada (' . plural($cambios, 'cambio', 'cambios') . ').' : 'No había cambios que guardar.');
         redirigir('/panel/actividades/' . $id . '/asistencia');
     });

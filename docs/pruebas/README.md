@@ -18,6 +18,30 @@ prueba) o en el servidor del curso cuando esté desplegado. Las cuentas están e
 Nunca se corre `cargar_datos.php --limpiar` en el servidor mientras otra persona prueba: borra la
 base y todas las claves del grupo en Redis.
 
+## Pruebas automatizadas
+
+`scripts/pruebas/correr.php` sigue los pasos de los tres documentos por HTTP, como un navegador, con
+las cuentas de los datos de prueba, y anota lo que obtuvo en cada paso:
+
+```bash
+php scripts/pruebas/correr.php                                                # en el servidor, con su .env
+docker compose exec app php scripts/pruebas/correr.php --url=http://localhost   # en Codespaces
+```
+
+- En el servidor (o en Codespaces contra su propia aplicación) también corren las pruebas que leen o
+  escriben directo en MongoDB y Redis: EC-03, EC-04, DI-09 y el paso 4 de CN-03 y de EC-06. Desde
+  otro equipo, con `--url=https://…`, esas se omiten solas.
+- Los pasos que necesitan pausar o detener un motor (EC-01 pasos 2 a 6, EC-02, EC-05 y EC-06 pasos 2
+  y 3) se omiten: se prueban a mano.
+- Tarda unos 10 minutos porque CN-03 espera a que venza su reserva (`RESERVA_MINUTOS`) mientras
+  corren las demás. Con `--sin-espera` termina en un par de minutos, sin los pasos 4 a 6 de CN-03.
+  `--solo=CN-01,DI` corre solo esas pruebas o grupos.
+- Crea actividades «Prueba XX-NN mmdd-hhmm» de coordinador1 y al final las elimina, o las cancela si
+  tienen inscripciones (`--conservar` las deja). DI-07 bloquea 15 minutos el correo de voluntario2;
+  si el script tiene acceso al Redis de la aplicación, quita el bloqueo al terminar.
+- El informe queda en `docs/pruebas/resultados/` y sirve de evidencia para la columna «Resultado
+  obtenido».
+
 ## Cómo documentar una prueba
 
 Copie este bloque en su archivo y complételo. La columna "Resultado obtenido" se llena al correr la

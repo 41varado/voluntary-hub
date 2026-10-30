@@ -21,6 +21,15 @@ function url(string $ruta = '/', array $consulta = []): string
     return $url;
 }
 
+/**
+ * URL completa para los enlaces que salen de la aplicación (correos). Usa APP_URL, que no lleva la
+ * subcarpeta porque url() ya agrega APP_BASE. Sirve también en el cron, donde no hay HTTP_HOST.
+ */
+function url_absoluta(string $ruta = '/', array $consulta = []): string
+{
+    return rtrim((string) Config::get('APP_URL', 'http://localhost:8080'), '/') . url($ruta, $consulta);
+}
+
 function redirigir(string $ruta, array $consulta = []): never
 {
     header('Location: ' . url($ruta, $consulta), true, 303);

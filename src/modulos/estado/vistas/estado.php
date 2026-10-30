@@ -53,4 +53,6 @@ $textosModo = [
     </section>
 </div>
 
+<?= Ganchos::html('estado.secciones', $mongo['ok']) ?>
+
 <p class="texto-suave">Esta misma información está en formato JSON en <a href="<?= e(url('/estado.json')) ?>">/estado.json</a>.</p>
