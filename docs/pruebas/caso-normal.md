@@ -6,13 +6,14 @@ Responsable: Jafet Alvarado Barboza (Persona 1). Formato y reglas en [README.md]
 |---|---|---|
 | CN-01 | Flujo principal: publicar, reservar, confirmar, pasar lista y ver las horas | Pasa |
 | CN-02 | Sin sobrecupo: con la actividad llena se rechaza la reserva, y un cupo liberado se puede volver a tomar | Pasa |
-| CN-03 | Una reserva sin confirmar vence y devuelve el cupo | Pasa (el paso 3 no se comprobó) |
+| CN-03 | Una reserva sin confirmar vence y devuelve el cupo | Pasa |
 
 Resultados del 26 de octubre de 2026 en el servidor del curso (https://grupo3.crnube.net/proyecto),
 con las pruebas automatizadas de `scripts/pruebas/correr.php` ([cómo se corren](README.md#pruebas-automatizadas)).
 El informe completo está en [resultados/pruebas_20261026_201329.txt](resultados/pruebas_20261026_201329.txt).
 El script sigue los pasos por HTTP, con una sesión por cuenta, y al título de cada actividad de
-prueba le agrega la fecha y la hora de la corrida («Prueba CN-01 1026-2013»).
+prueba le agrega la fecha y la hora de la corrida («Prueba CN-01 1026-2013»). El paso 3 de CN-03,
+que pasa en el navegador, se comprobó en Chrome el 28 de octubre.
 
 ## Preparación
 
@@ -92,12 +93,14 @@ Vale para las tres pruebas, que se corren en orden y en la misma sesión:
 |---|---|---|---|
 | 1 | Ventana A: entrar como coordinador1 (con **Salir** antes, si sigue abierta la sesión de voluntario2) y publicar "Prueba CN-03" con **cupo 1**. | Mensaje "Actividad publicada. Ahora puede agregarle imágenes." | Igual. |
 | 2 | Ventana B: con la sesión de voluntario1 (entrar de nuevo si se cerró), abrir "Prueba CN-03" y clic en **Reservar cupo**. No confirmar. | Mensaje "Cupo reservado. …", cuenta regresiva de un minuto o menos y el medidor dice "Sin cupos". | Igual, pero la cuenta regresiva fue de 10 minutos (el `RESERVA_MINUTOS` del servidor). |
-| 3 | Ventana B: esperar a que la cuenta regresiva llegue a 0:00, sin recargar. | Aparece "El tiempo terminó. Recargue la página para ver si todavía hay cupo." | No se comprobó: la cuenta regresiva la maneja JavaScript en el navegador. La página sí trae el aviso «El tiempo terminó…», oculto hasta que la cuenta llega a 0:00. |
+| 3 | Ventana B: esperar a que la cuenta regresiva llegue a 0:00, sin recargar. | Aparece "El tiempo terminó. Recargue la página para ver si todavía hay cupo." | Igual: con `RESERVA_MINUTOS=1`, la cuenta empezó en 1:00 y al minuto llegó a 0:00 y apareció el aviso, sin recargar. |
 | 4 | En una terminal, correr `php scripts/liberar_reservas.php` (en Codespaces, con `docker compose exec app`). | Imprime la fecha y la hora, y "reservas liberadas: 1". Si da más, son reservas de los datos de prueba que vencieron mientras tanto. | Igual: «2026-10-26 20:23:32 reservas liberadas: 1»; la inscripción quedó «expirada» en MongoDB. |
 | 5 | Ventana B: recargar la actividad. | El medidor vuelve a "1 cupo libre" y el bloque dice "Su inscripción anterior quedó vencida. Puede reservar de nuevo." | Igual. |
 | 6 | Ventana B: abrir **Mis inscripciones**. | "Prueba CN-03" aparece en **Anteriores y canceladas** con el estado "Venció sin confirmar". | Igual. |
 
-- **Evidencia:** [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección CN-03.
-- **Estado:** Pasa, salvo el paso 3, que no se comprobó porque es JavaScript del navegador.
-- **Fecha y entorno:** 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`
-- **Notas:** No se cambió `RESERVA_MINUTOS` a 1 en el `.env` del servidor: la reserva duró 10 minutos y el script esperó a que venciera mientras corrían las demás pruebas.
+- **Evidencia:** [informe de la corrida](resultados/pruebas_20261026_201329.txt), sección CN-03; paso 3:
+  [img/CN-03-paso-3.png](img/CN-03-paso-3.png).
+- **Estado:** Pasa
+- **Fecha y entorno:** 2026-10-26, servidor del curso, con `scripts/pruebas/correr.php`; paso 3:
+  2026-10-28, instalación local, en Chrome.
+- **Notas:** No se cambió `RESERVA_MINUTOS` a 1 en el `.env` del servidor: la reserva duró 10 minutos y el script esperó a que venciera mientras corrían las demás pruebas. El paso 3 se hizo en la instalación local de la prueba de instalación desde cero (S4), con `RESERVA_MINUTOS=1`.

@@ -1,0 +1,16 @@
+# Ficha para el portal de proyectos destacados del curso (sección 7 del enunciado).
+nombre: VoluntaCR
+resumen: Portal de voluntariado con cupos sin sobrecupo, asistencia y horas; Redis filtra las reservas y MongoDB es la fuente de verdad
+problema: Las ONG y las organizaciones comunales coordinan el voluntariado con formularios y chats; se inscribe más gente de la que cabe, nadie sabe quién asistió y las horas de cada voluntario se pierden
+usuarios: Voluntarios, coordinadores de organizaciones comunales y ONG, y la administración del portal
+motores: [MongoDB, Redis]
+lenguaje: PHP
+licencia: MIT
+repositorio: https://github.com/41varado/voluntary-hub
+demo_video:
+demo_url: https://grupo3.crnube.net/proyecto
+captura: docs/img/captura-portal.png
+grupo: 3
+dia: martes
+periodo: II-2026
+autores_publicos: [Luis Aguilar Monge, Jafet Alvarado Barboza, Manuel Mora Sandi, Derek Rojas Mendoza]
