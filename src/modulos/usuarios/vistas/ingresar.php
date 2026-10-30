@@ -4,7 +4,7 @@
     <?php if ($error !== ''): ?>
         <p class="aviso aviso--error" role="alert"><?= e($error) ?></p>
     <?php endif; ?>
-    <form class="tarjeta formulario" method="post" action="<?= e(url('/ingresar')) ?>">
+    <form class="tarjeta formulario" method="post" action="<?= e(url('/ingresar')) ?>" novalidate>
         <?= csrf_campo() ?>
         <div class="campo">
             <label for="correo">Correo electrónico</label>

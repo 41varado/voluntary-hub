@@ -138,7 +138,7 @@ $describe = fn(string $campo) => isset($errores[$campo]) ? ' aria-describedby="e
         <?php endif; ?>
 
         <?php if (count($actividad['imagenes']) < Imagenes::MAXIMO_POR_ACTIVIDAD): ?>
-            <form class="formulario" method="post" enctype="multipart/form-data" action="<?= e(url('/panel/actividades/' . $id . '/imagenes')) ?>">
+            <form class="formulario" method="post" enctype="multipart/form-data" action="<?= e(url('/panel/actividades/' . $id . '/imagenes')) ?>" novalidate>
                 <?= csrf_campo() ?>
                 <div class="campo">
                     <label for="imagenes">Agregar imágenes</label>

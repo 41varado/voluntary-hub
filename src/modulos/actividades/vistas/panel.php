@@ -58,7 +58,7 @@ $nombresEstado = ['publicada' => 'Publicada', 'borrador' => 'Borrador', 'cancela
                                     <button class="boton-enlace" type="submit">Publicar</button>
                                 </form>
                             <?php elseif ($a['estado'] === 'publicada'): ?>
-                                <form method="post" action="<?= e(url('/panel/actividades/' . $id . '/estado')) ?>" data-confirmar="¿Cancelar esta actividad? Las personas inscritas la verán como cancelada.">
+                                <form method="post" action="<?= e(url('/panel/actividades/' . $id . '/estado')) ?>" data-confirmar="¿Cancelar esta actividad? Las personas inscritas la verán como cancelada." data-confirmar-boton="Cancelar actividad">
                                     <?= csrf_campo() ?><input type="hidden" name="estado" value="cancelada">
                                     <button class="boton-enlace" type="submit">Cancelar</button>
                                 </form>
