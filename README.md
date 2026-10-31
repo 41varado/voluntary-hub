@@ -112,9 +112,36 @@ Más detalle: [arquitectura](docs/arquitectura/README.md) ·
   `storage/correos.log`). PHP la usa con `allow_url_fopen` y la extensión `openssl`, que vienen
   activas casi siempre.
 
-Con Docker (opción A) o Codespaces (opción B) no hay que instalar nada de esto.
+En el servidor del curso, PHP, MongoDB y Redis los instaló el profesor
+([ver Instalación](#en-el-servidor-del-curso-virtualmin)). Con Docker (opción A) o Codespaces
+(opción B) no hay que instalar nada de esto.
 
 ## Instalación
+
+La aplicación quedó instalada en el **servidor en la nube del curso**, que se administra con el
+panel **Virtualmin**: es la [demo en línea](https://grupo3.crnube.net/proyecto). Las opciones A, B
+y C sirven para instalarla en otra máquina, por ejemplo para desarrollo o para probarla desde cero.
+
+### En el servidor del curso (Virtualmin)
+
+**El profesor instaló PHP, MongoDB y Redis en el servidor**, así que ahí el grupo no tuvo que
+instalar nada de eso. La aplicación usa el MongoDB del servidor, no Atlas (D10), y el Redis que
+comparten los grupos, donde todas las claves de la aplicación llevan el prefijo `grupo3:voluntacr:`.
+Para instalar la aplicación ahí:
+
+1. Clonar el repositorio en la cuenta del grupo y servir `public/` en la subcarpeta `/proyecto`
+   (`APP_BASE=/proyecto`).
+2. Copiar `.env.example` como `.env` y llenarlo: la URI del MongoDB del servidor con el usuario del
+   grupo, los datos del Redis compartido con `REDIS_PREFIX=grupo3:voluntacr:`, `APP_URL`, las claves
+   de Mailjet y `APP_DEBUG=false`.
+3. Correr `php scripts/probar_conexiones.php`, `php scripts/crear_esquema.php` y
+   `php scripts/cargar_datos.php --limpiar`.
+4. En Virtualmin, programar `scripts/liberar_reservas.php` cada minuto y
+   `scripts/enviar_correos.php` cada 5 minutos.
+5. Abrir https://grupo3.crnube.net/proyecto/estado: debe decir **Funcionamiento normal**.
+
+Los comandos completos, los permisos de las carpetas y cómo actualizar después de cada versión están
+en [docs/despliegue-virtualmin.md](docs/despliegue-virtualmin.md).
 
 ### Opción A: Docker (recomendada)
 
@@ -194,8 +221,6 @@ Abrir http://localhost:8080
    recorre por HTTP el caso normal, los errores de conexión y los datos inválidos en un par de
    minutos. Crea actividades «Prueba …», las borra al terminar y guarda el informe en
    `docs/pruebas/resultados/`.
-
-En el servidor del curso: ver [docs/despliegue-virtualmin.md](docs/despliegue-virtualmin.md).
 
 ## Variables de entorno
 
