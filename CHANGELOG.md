@@ -34,6 +34,9 @@ Release candidate del seguimiento 4.
   los demás formularios, en vez de los globos de validación del navegador.
 - README: los requisitos piden las extensiones `mbstring` y `fileinfo`, y la tabla de scripts incluye
   las tres mediciones y el script de mongosh.
+- README: la instalación empieza por el servidor del curso (Virtualmin), donde está la demo y
+  donde el profesor instaló PHP, MongoDB y Redis; las opciones A, B y C quedan para instalarla en
+  otra máquina.
 - `docs/arquitectura/README.md`: el diagrama muestra todas las claves de Redis, sus etiquetas ya no
   empiezan con «1.» (mermaid 11 las toma como una lista y muestra «Unsupported markdown: list») y la
   sección de mediciones tiene los resultados.
