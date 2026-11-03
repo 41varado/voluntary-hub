@@ -5,9 +5,10 @@ seguimiento del curso.
 
 ## [Sin publicar]
 
-## [0.9.0] - 2026-11-03
+## [1.0.0] - 2026-11-03
 
-Release candidate del seguimiento 4.
+Entrega final. El grupo expone en la semana 16, así que, como pide el enunciado, el
+seguimiento 4 se entrega directamente con esta versión, sin una 0.9.0.
 
 ### Agregado
 - `portal.yml`, la ficha para el portal de proyectos del curso.
@@ -141,8 +142,8 @@ Release candidate del seguimiento 4.
 - Avance del seguimiento 2: portal de actividades con filtros y caché, panel del coordinador con
   imágenes, reservas de cupo sin sobrecupo, cuentas de usuario, asistencia e historial de horas.
 
-[Sin publicar]: https://github.com/41varado/voluntary-hub/compare/v0.9.0...HEAD
-[0.9.0]: https://github.com/41varado/voluntary-hub/compare/v0.3.0...v0.9.0
+[Sin publicar]: https://github.com/41varado/voluntary-hub/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/41varado/voluntary-hub/compare/v0.3.0...v1.0.0
 [0.3.0]: https://github.com/41varado/voluntary-hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/41varado/voluntary-hub/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/41varado/voluntary-hub/tree/v0.1.0
